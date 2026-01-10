@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "master" ]
 
 jobs:
   build-and-test:
@@ -22,9 +22,11 @@ jobs:
           cmake \
           build-essential \
           libsdl2-dev \
-          libsdl2-image-dev \
-          libsdl2-ttf-dev \
-          libsdl2-mixer-dev
+          libasound2-dev \
+          libpulse-dev \
+          libx11-dev \
+          libwayland-dev \
+          libxkbcommon-dev
 
     - name: Configure CMake
       run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
