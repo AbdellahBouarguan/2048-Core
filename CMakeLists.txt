@@ -86,14 +86,17 @@ target_link_libraries(2048_core PRIVATE
 )
 
 # ==============================================================================
-# 6. Post-Build: Asset Management
+# 6. Post-Build: Asset Management (Safe)
 # ==============================================================================
-add_custom_command(TARGET 2048_core POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/assets
-    ${CMAKE_BINARY_DIR}/assets
-    COMMENT "Copying assets to build directory..."
-)
+# FIX: Check if directory exists before copying to prevent CI errors
+if(IS_DIRECTORY "${CMAKE_SOURCE_DIR}/assets")
+    add_custom_command(TARGET 2048_core POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets
+        ${CMAKE_BINARY_DIR}/assets
+        COMMENT "Copying assets to build directory..."
+    )
+endif()
 
 # ==============================================================================
 # 7. Core Logic Library (Decoupled)
