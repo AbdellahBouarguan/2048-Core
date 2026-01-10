@@ -1,13 +1,14 @@
 # Build Artifacts
 build/
 bin/
+lib/
 *.o
-*.obj
 *.a
 *.so
-*.dll
 *.dylib
 *.exe
+*.hex
+*.bin
 
 # CMake
 CMakeCache.txt
@@ -16,18 +17,16 @@ cmake_install.cmake
 install_manifest.txt
 compile_commands.json
 
-# IDE / Editors
+# Local Configuration
 .vscode/
 .idea/
 *.swp
 *.swo
 .DS_Store
+thumbs.db
 
 # Android
-.gradle/
 local.properties
+.gradle/
 *.apk
 *.ap_
-android/build/
-android/.gradle/
-android/app/build/
