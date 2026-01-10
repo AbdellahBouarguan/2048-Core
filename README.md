@@ -1,6 +1,6 @@
 Here is the complete `README.md` in a single copy-paste block.
 
-````markdown
+
 # 2048-Core
 
 ![Standard](https://img.shields.io/badge/standard-C89-orange)
@@ -27,7 +27,7 @@ The project utilizes a monorepo structure designed for zero-dependency portabili
 ├── build/          # Build artifacts
 └── scripts/        # Automation scripts
 ```
-````
+
 
 ## 🚀 Build Instructions
 
