@@ -39,7 +39,7 @@ The included script handles directory creation and CMake configuration automatic
 
 ```bash
 # Build Debug version
-./scripts/build_local.sh debug
+./scripts/build.sh debug
 
 # Run
 ./build/2048_core
