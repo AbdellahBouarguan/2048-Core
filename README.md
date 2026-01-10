@@ -58,6 +58,3 @@ The included script handles directory creation and CMake configuration automatic
 3. **Decoupled Logic**: The `game_logic` module is mathematically pure and has no knowledge of the rendering engine. This allows for headless testing and easy porting to other engines (e.g., Unity/Godot via plugins).
 4. **Procedural Rendering**: Graphics are generated at runtime using vector math, ensuring crisp visuals at any resolution without managing sprite assets.
 
-```
-
-```
