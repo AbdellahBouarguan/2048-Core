@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
   pull_request:
-    branches: ["main"]
+    branches: [ "main" ]
 
 jobs:
   build-and-test:
@@ -12,37 +12,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    - name: Checkout Code
+      uses: actions/checkout@v3
 
-      - name: Install System Dependencies
-        # We need these libraries so our static SDL2 build can link against system drivers
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            cmake \
-            build-essential \
-            libasound2-dev \
-            libpulse-dev \
-            libx11-dev \
-            libxext-dev \
-            libxrandr-dev \
-            libxcursor-dev \
-            libxi-dev \
-            libxinerama-dev \
-            libwayland-dev \
-            libxkbcommon-dev
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          cmake \
+          build-essential \
+          libsdl2-dev \
+          libsdl2-image-dev \
+          libsdl2-ttf-dev \
+          libsdl2-mixer-dev
 
-      - name: Configure CMake
-        # Enable Testing Mode
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+    - name: Configure CMake
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 
-      - name: Build Project
-        run: cmake --build build --parallel $(nproc)
+    - name: Build Project
+      run: cmake --build build --parallel $(nproc)
 
-      - name: Run Unit Tests
-        # This runs the logic tests we wrote earlier
-        run: ./build/run_tests
+    - name: Run Unit Tests
+      run: ./build/run_tests
 
   static-analysis:
     name: Static Analysis (Cppcheck)
@@ -55,7 +46,6 @@ jobs:
         run: sudo apt-get install -y cppcheck
 
       - name: Run Analysis
-        # Checks src/ and include/ for bugs, enforcing C89 standard where possible
         run: |
           cppcheck --error-exitcode=1 \
                    --language=c \
