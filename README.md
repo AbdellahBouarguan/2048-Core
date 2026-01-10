@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Platform](https://img.shields.io/badge/platform-Linux%20|%20Android-green)
 
-A high-performance, cross-platform implementation of the 2048 game engine written in strict ANSI C (C89).
+A high-performance, cross-platform implementation of the 2048 game written in strict ANSI C (C89).
 
 ## 🏗 Project Architecture
 
