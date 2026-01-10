@@ -30,6 +30,6 @@ We welcome contributions! Please follow these engineering standards to maintain 
 ## 🧪 Testing
 Run the local test suite before pushing:
 ```bash
-./scripts/build_local.sh debug
+./scripts/build.sh debug
 ./build/run_tests
 ```
