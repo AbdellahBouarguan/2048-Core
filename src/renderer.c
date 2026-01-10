@@ -2,7 +2,7 @@
  * Project: 2048-Core
  * File: src/renderer.c
  * Standard: ANSI C (C89)
- * Description: Procedural rendering with embedded font and official color palette.
+ * Description: Procedural rendering with fixed Score display.
  * ============================================================================== */
 
 #include "renderer.h"
@@ -36,7 +36,6 @@ static const unsigned char FONT[10][5] = {
     {0x1F, 0x11, 0x1F, 0x01, 0x1F}  /* 9 */
 };
 
-/* Color definition struct */
 typedef struct {
     Uint8 r, g, b;
 } Color;
@@ -120,17 +119,17 @@ static Color get_tile_color(int value)
 }
 
 /* Get text color (Dark for 2/4, White for others) */
-static Color get_text_color(int value)
+static Color get_tile_text_color(int value)
 {
     Color c;
     if (value <= 4) {
         c.r = 119;
         c.g = 110;
-        c.b = 101;
+        c.b = 101; /* Dark Grey */
     } else {
         c.r = 249;
         c.g = 246;
-        c.b = 242;
+        c.b = 242; /* White */
     }
     return c;
 }
@@ -158,43 +157,65 @@ static void draw_digit(SDL_Renderer *renderer, int digit, int x, int y, int size
     }
 }
 
-/* Draw a full number centered in the tile */
-static void draw_number(SDL_Renderer *renderer, int value, int tile_x, int tile_y, int tile_w)
+/**
+ * Draw a full number.
+ * @param area_w: The width of the container (for centering).
+ * @param size_override: If > 0, used for Tile scaling logic. If 0, used for Score logic.
+ * @param color: Explicit color to draw the text.
+ */
+static void draw_number(SDL_Renderer *renderer, int value, int x, int y, int area_w,
+                        int size_override, Color color)
 {
     int temp = value;
     int digits[10]; /* Store digits in reverse order */
     int count = 0;
     int i;
-    int pixel_scale = 4; /* Scale of the 'pixels' of the font */
-    int digit_width = 5 * pixel_scale;
-    int digit_spacing = 2 * pixel_scale;
+    int pixel_scale;
+    int digit_width;
+    int digit_spacing;
     int total_width;
     int start_draw_x;
     int start_draw_y;
-    Color color = get_text_color(value);
 
-    /* Extract digits */
-    if (value == 0)
-        return;
-
-    while (temp > 0) {
-        digits[count++] = temp % 10;
-        temp /= 10;
+    /* Handle 0 explicitly so it draws */
+    if (value == 0) {
+        digits[count++] = 0;
+    } else {
+        while (temp > 0) {
+            digits[count++] = temp % 10;
+            temp /= 10;
+        }
     }
 
-    /* Calculate centering */
-    /* Reduce scale for large numbers to fit */
-    if (value > 1000)
-        pixel_scale = 3;
-    if (value > 10000)
-        pixel_scale = 2;
+    /* Determine Scale and Layout */
+    if (size_override > 0) {
+        /* Tile Logic: Scale down as numbers get larger to fit */
+        pixel_scale = 4;
+        if (value > 100)
+            pixel_scale = 3;
+        if (value > 1000)
+            pixel_scale = 2;
+        if (value > 10000)
+            pixel_scale = 1;
 
-    digit_width = 5 * pixel_scale;
-    digit_spacing = 1 * pixel_scale;
+        digit_width = 5 * pixel_scale;
+        digit_spacing = 2 * pixel_scale;
 
-    total_width = (count * digit_width) + ((count - 1) * digit_spacing);
-    start_draw_x = tile_x + (tile_w - total_width) / 2;
-    start_draw_y = tile_y + (tile_w - (5 * pixel_scale)) / 2;
+        total_width = (count * digit_width) + ((count - 1) * digit_spacing);
+        /* Center in Tile */
+        start_draw_x = x + (area_w - total_width) / 2;
+        start_draw_y = y + (area_w - (5 * pixel_scale)) / 2;
+    } else {
+        /* Score Logic: Fixed large size */
+        pixel_scale = 4;
+        digit_width = 5 * pixel_scale;
+        digit_spacing = 2 * pixel_scale;
+
+        total_width = (count * digit_width) + ((count - 1) * digit_spacing);
+        /* Center Horizontally in Screen */
+        start_draw_x = x + (area_w - total_width) / 2;
+        start_draw_y = y; /* Top aligned */
+    }
 
     /* Draw digits (iterating backwards because we extracted them backwards) */
     for (i = count - 1; i >= 0; i--) {
@@ -245,39 +266,53 @@ void renderer_draw(RendererContext *ctx, const GameState *state)
 {
     int i, row, col, val;
     SDL_Rect rect;
-    Color c;
+    Color c_bg;
+    Color c_text;
+
+    /* Fixed Colors */
+    Color c_score = {119, 110, 101}; /* Dark Grey for Score */
+
+    /* Layout Variables */
+    int score_y_pos = 20;
+    int effective_start_y = START_Y + 30; /* Shift board down */
 
     /* 1. Clear Screen (Background Color: #FAF8EF) */
     SDL_SetRenderDrawColor(ctx->renderer, 250, 248, 239, 255);
     SDL_RenderClear(ctx->renderer);
 
-    /* 2. Draw Board Background Container (#BBADA0) */
+    /* 2. Draw Score (Top Center) */
+    /* We pass 0 for size_override to indicate Score Logic */
+    draw_number(ctx->renderer, (int)state->score, 0, score_y_pos, SCREEN_WIDTH, 0, c_score);
+
+    /* 3. Draw Board Background Container (#BBADA0) */
     SDL_SetRenderDrawColor(ctx->renderer, 187, 173, 160, 255);
     rect.x = START_X;
-    rect.y = START_Y;
+    rect.y = effective_start_y;
     rect.w = BOARD_SIZE;
     rect.h = BOARD_SIZE;
     SDL_RenderFillRect(ctx->renderer, &rect);
 
-    /* 3. Draw Tiles */
+    /* 4. Draw Tiles */
     for (i = 0; i < 16; i++) {
         row = i / 4;
         col = i % 4;
         val = state->board[i];
 
         rect.x = START_X + TILE_MARGIN + (col * (TILE_SIZE + TILE_MARGIN));
-        rect.y = START_Y + TILE_MARGIN + (row * (TILE_SIZE + TILE_MARGIN));
+        rect.y = effective_start_y + TILE_MARGIN + (row * (TILE_SIZE + TILE_MARGIN));
         rect.w = TILE_SIZE;
         rect.h = TILE_SIZE;
 
         /* Draw Tile Background */
-        c = get_tile_color(val);
-        SDL_SetRenderDrawColor(ctx->renderer, c.r, c.g, c.b, 255);
+        c_bg = get_tile_color(val);
+        SDL_SetRenderDrawColor(ctx->renderer, c_bg.r, c_bg.g, c_bg.b, 255);
         SDL_RenderFillRect(ctx->renderer, &rect);
 
         /* Draw Number */
         if (val > 0) {
-            draw_number(ctx->renderer, val, rect.x, rect.y, TILE_SIZE);
+            c_text = get_tile_text_color(val);
+            /* Pass TILE_SIZE as size_override to indicate Tile Logic (centering/scaling) */
+            draw_number(ctx->renderer, val, rect.x, rect.y, TILE_SIZE, TILE_SIZE, c_text);
         }
     }
 
