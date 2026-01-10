@@ -1,0 +1,60 @@
+name: Release 1.0
+
+on:
+  push:
+    tags:
+      - "v*" # Triggers only when you push a tag like v1.0.0
+
+permissions:
+  contents: write # Required to create the Release page
+
+jobs:
+  build-release:
+    name: Build & Publish
+    runs-on: ubuntu-20.04 # Use older Linux for better compatibility (GLIBC 2.31)
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libsdl2-dev
+
+      - name: Build (Release Mode)
+        # We build with optimizations (-O3) and strip debug symbols
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel $(nproc)
+          strip build/2048_core  # Reduces file size significantly
+
+      - name: Create Zip Archive
+        run: |
+          mkdir -p package/2048-Core
+
+          # Copy Executable
+          cp build/2048_core package/2048-Core/
+
+          # Copy Documentation
+          cp README.md package/2048-Core/
+          cp LICENSE package/2048-Core/
+          cp CONTRIBUTING.md package/2048-Core/
+
+          # Copy Assets (Only if they exist)
+          if [ -d "assets" ]; then cp -r assets package/2048-Core/; fi
+
+          # Create the Zip
+          cd package
+          zip -r ../2048-Core-Linux-x64.zip 2048-Core
+          cd ..
+
+      - name: Upload Release to GitHub
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            2048-Core-Linux-x64.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
