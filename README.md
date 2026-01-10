@@ -1,6 +1,3 @@
-Here is the complete `README.md` in a single copy-paste block.
-
-
 # 2048-Core
 
 ![Standard](https://img.shields.io/badge/standard-C89-orange)
