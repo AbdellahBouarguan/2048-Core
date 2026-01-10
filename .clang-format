@@ -1,0 +1,19 @@
+---
+Language: Cpp
+Standard: c++03 # Closest approximation to force C89 compat in style
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+
+# Braces & Wrapping
+BreakBeforeBraces: Linux
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
+# Pointer Alignment
+PointerAlignment: Right

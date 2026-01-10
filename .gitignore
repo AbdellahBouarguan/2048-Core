@@ -1,0 +1,33 @@
+# Build Artifacts
+build/
+bin/
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.dylib
+*.exe
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# IDE / Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Android
+.gradle/
+local.properties
+*.apk
+*.ap_
+android/build/
+android/.gradle/
+android/app/build/
