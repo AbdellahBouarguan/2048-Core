@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
     }
 
     /* Initial Render */
-    renderer_draw(&ctx, &state);
+    renderer_draw(&ctx, &state, STATE_PLAYING);
 
     /* 4. The Game Loop */
     while (running) {
@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
                     game_spawn_tile(&state);
                     game_spawn_tile(&state);
                     storage_save(save_path, &state);
-                    renderer_draw(&ctx, &state);
+                    renderer_draw(&ctx, &state, STATE_PLAYING);
                     moved = 0; /* Prevent double render logic below */
                 }
 
@@ -180,7 +180,7 @@ int main(int argc, char *argv[])
                     storage_save(save_path, &state);
 
                     /* D. Render */
-                    renderer_draw(&ctx, &state);
+                    renderer_draw(&ctx, &state, STATE_PLAYING);
                 }
             }
         }
