@@ -2,7 +2,7 @@
  * Project: 2048-Core
  * File: src/main.c
  * Standard: ANSI C (C89)
- * Description: Application Entry Point, Event Loop, and Path Management.
+ * Description: Application Entry Point with FSM Architecture.
  * ============================================================================== */
 
 #include <SDL.h>
@@ -29,7 +29,6 @@
 static void resolve_save_path(char *buffer, size_t max_len)
 {
 #ifdef __ANDROID__
-    /* Android: Use SDL's internal storage mapping */
     const char *path = SDL_GetPrefPath("MyOrg", "2048Core");
     if (path) {
         strncpy(buffer, path, max_len);
@@ -38,44 +37,76 @@ static void resolve_save_path(char *buffer, size_t max_len)
         strcpy(buffer, ".");
     }
 #elif defined(__linux__)
-    /* Linux: Follow XDG Base Directory Specification (~/.local/share/2048-core/) */
     const char *home = getenv("HOME");
     char path[512];
-    struct stat st; /* FIXED: Moved declaration to top to comply with C89 */
+    struct stat st;
 
     if (home) {
         sprintf(path, "%s/.local/share/2048-core", home);
-
-        /* Create directory if it doesn't exist (POSIX) */
         if (stat(path, &st) == -1) {
             mkdir(path, 0700);
-            /* Also ensure parent exists? For simplicity, we assume ~/.local/share exists
-             * or we fall back to local folder if mkdir fails.
-             */
         }
         strncpy(buffer, path, max_len);
     } else {
         strcpy(buffer, ".");
     }
 #else
-    /* Fallback (Windows/Other): Local folder */
     strcpy(buffer, ".");
 #endif
 }
 
+/* [NEW] Input Abstraction Layer */
+static InputCommand handle_input(SDL_Event *e)
+{
+    if (e->type == SDL_QUIT) {
+        return INPUT_EXIT;
+    }
+    if (e->type == SDL_KEYDOWN) {
+        switch (e->key.keysym.sym) {
+        case SDLK_UP:
+        case SDLK_w:
+            return INPUT_UP;
+        case SDLK_DOWN:
+        case SDLK_s:
+            return INPUT_DOWN;
+        case SDLK_LEFT:
+        case SDLK_a:
+            return INPUT_LEFT;
+        case SDLK_RIGHT:
+        case SDLK_d:
+            return INPUT_RIGHT;
+        case SDLK_RETURN:
+        case SDLK_SPACE:
+            return INPUT_CONFIRM;
+        case SDLK_r:
+            return INPUT_RESET;
+        case SDLK_ESCAPE:
+            return INPUT_EXIT;
+        default:
+            return INPUT_NONE;
+        }
+    }
+    return INPUT_NONE;
+}
+
 int main(int argc, char *argv[])
 {
-    /* C89 Variable Declarations */
+    /* Variables */
     RendererContext ctx;
     GameState state;
     SDL_Event event;
     int running = 1;
-    int moved = 0;
-    int reset_flag = 0;
     int i;
     char save_path[512];
     Uint32 frame_start;
     int frame_time;
+
+    /* FSM State */
+    AppState app_state = STATE_MENU;
+    InputCommand cmd = INPUT_NONE;
+    InputCommand frame_cmd = INPUT_NONE; /* Capture last valid input per frame */
+    Uint32 game_over_timer = 0;          /* Timer for Game Over transition */
+    int reset_flag = 0;
 
     /* 1. CLI Argument Parsing */
     for (i = 1; i < argc; i++) {
@@ -99,93 +130,120 @@ int main(int argc, char *argv[])
 
     /* 3. Game State Loading */
     if (reset_flag) {
-        printf("[Game] Reset requested. Starting fresh.\n");
         game_init(&state);
         game_spawn_tile(&state);
         game_spawn_tile(&state);
-        /* Autosave the clean state immediately */
         storage_save(save_path, &state);
     } else {
-        int load_result = storage_load(save_path, &state);
-        if (load_result != STORAGE_OK) {
-            printf("[Game] No valid save found (Code %d). Creating new game.\n", load_result);
+        if (storage_load(save_path, &state) != STORAGE_OK) {
             game_init(&state);
             game_spawn_tile(&state);
             game_spawn_tile(&state);
-        } else {
-            printf("[Game] Save loaded successfully.\n");
         }
     }
 
-    /* Initial Render */
-    renderer_draw(&ctx, &state, STATE_PLAYING);
-
-    /* 4. The Game Loop */
+    /* 4. The Game Loop (FSM Refactor) */
     while (running) {
         frame_start = SDL_GetTicks();
+        frame_cmd = INPUT_NONE;
 
         /* A. Input Polling */
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
+            cmd = handle_input(&event);
+            if (cmd == INPUT_EXIT) {
                 running = 0;
-            } else if (event.type == SDL_KEYDOWN) {
-                moved = 0;
+            } else if (cmd != INPUT_NONE) {
+                frame_cmd = cmd;
+            }
+        }
 
-                /* Don't allow moves if game is over, unless resetting */
-                if (state.status != GAME_OVER) {
-                    switch (event.key.keysym.sym) {
-                    case SDLK_UP:
-                    case SDLK_w:
-                        moved = game_slide(&state, DIR_UP);
-                        break;
-                    case SDLK_DOWN:
-                    case SDLK_s:
-                        moved = game_slide(&state, DIR_DOWN);
-                        break;
-                    case SDLK_LEFT:
-                    case SDLK_a:
-                        moved = game_slide(&state, DIR_LEFT);
-                        break;
-                    case SDLK_RIGHT:
-                    case SDLK_d:
-                        moved = game_slide(&state, DIR_RIGHT);
-                        break;
-                    }
+        /* B. State Machine Logic */
+        switch (app_state) {
+        case STATE_MENU:
+            if (frame_cmd == INPUT_CONFIRM) {
+                /* Check if board is empty, if so, spawn tiles */
+                int has_tiles = 0;
+                for (i = 0; i < 16; i++) {
+                    if (state.board[i] != 0)
+                        has_tiles = 1;
                 }
 
-                /* Global Controls */
-                if (event.key.keysym.sym == SDLK_ESCAPE) {
-                    running = 0;
-                } else if (event.key.keysym.sym == SDLK_r) {
-                    /* Hard Reset */
+                if (!has_tiles) {
+                    game_init(&state);
+                    game_spawn_tile(&state);
+                    game_spawn_tile(&state);
+                }
+
+                app_state = STATE_PLAYING;
+                printf("[FSM] Switching to STATE_PLAYING\n");
+            }
+            break;
+
+        case STATE_PLAYING:
+            /* Handle Move Inputs */
+            {
+                int moved = 0;
+                if (frame_cmd == INPUT_UP)
+                    moved = game_slide(&state, DIR_UP);
+                else if (frame_cmd == INPUT_DOWN)
+                    moved = game_slide(&state, DIR_DOWN);
+                else if (frame_cmd == INPUT_LEFT)
+                    moved = game_slide(&state, DIR_LEFT);
+                else if (frame_cmd == INPUT_RIGHT)
+                    moved = game_slide(&state, DIR_RIGHT);
+
+                if (moved) {
+                    game_spawn_tile(&state);
+                    storage_save(save_path, &state);
+                    /* Reset timer if a move was successful (rare edge case if game was thought
+                     * over) */
+                    game_over_timer = 0;
+                }
+
+                /* Check Game Over Logic */
+                if (game_check_over(&state)) {
+                    if (game_over_timer == 0) {
+                        printf("[Game] Check Over True. Starting Timer.\n");
+                        game_over_timer = SDL_GetTicks();
+                    }
+
+                    /* Wait 1 second before switching */
+                    if (SDL_GetTicks() - game_over_timer > 1000) {
+                        state.status = GAME_OVER;
+                        app_state = STATE_GAMEOVER;
+                        printf("[FSM] Switching to STATE_GAMEOVER\n");
+                    }
+                } else {
+                    game_over_timer = 0;
+                }
+
+                /* Allow manual reset during play */
+                if (frame_cmd == INPUT_RESET) {
                     game_init(&state);
                     game_spawn_tile(&state);
                     game_spawn_tile(&state);
                     storage_save(save_path, &state);
-                    renderer_draw(&ctx, &state, STATE_PLAYING);
-                    moved = 0; /* Prevent double render logic below */
-                }
-
-                /* B. Logic Update */
-                if (moved) {
-                    game_spawn_tile(&state);
-
-                    /* Check Game Over logic */
-                    if (game_check_over(&state)) {
-                        state.status = GAME_OVER;
-                        printf("[Game] Game Over! Final Score: %lu\n", state.score);
-                    }
-
-                    /* C. Autosave */
-                    storage_save(save_path, &state);
-
-                    /* D. Render */
-                    renderer_draw(&ctx, &state, STATE_PLAYING);
+                    game_over_timer = 0;
                 }
             }
+            break;
+
+        case STATE_GAMEOVER:
+            if (frame_cmd == INPUT_RESET || frame_cmd == INPUT_CONFIRM) {
+                game_init(&state);
+                game_spawn_tile(&state);
+                game_spawn_tile(&state);
+                storage_save(save_path, &state);
+                app_state = STATE_PLAYING;
+                printf("[FSM] Restarting Game -> STATE_PLAYING\n");
+            }
+            break;
         }
 
-        /* E. Frame Rate Cap */
+        /* C. Render */
+        renderer_draw(&ctx, &state, app_state);
+
+        /* D. Frame Rate Cap */
         frame_time = (int)(SDL_GetTicks() - frame_start);
         if (FRAME_DELAY > frame_time) {
             SDL_Delay((Uint32)(FRAME_DELAY - frame_time));
