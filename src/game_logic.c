@@ -53,14 +53,23 @@ static unsigned long merge_line(int *line)
 
     return score_inc;
 }
+
 void game_init(GameState *state)
 {
     int i;
+    /* Reset gameplay variables */
     state->score = 0;
     state->status = GAME_ACTIVE;
+
+    /* Clear board */
     for (i = 0; i < 16; i++) {
         state->board[i] = 0;
     }
+
+    /* Note: state->high_score is explicitly NOT reset here to preserve it
+     * across game sessions or restarts. It must be initialized to 0
+     * by the caller (storage loader) on the very first run.
+     */
 }
 
 void game_spawn_tile(GameState *state)
@@ -82,9 +91,9 @@ void game_spawn_tile(GameState *state)
         return;
 
 #ifdef TEST_MODE
-    /* Deterministic for Testing: Always pick the first empty slot */
+    /* Deterministic for Testing */
     rand_index = empty_indices[0];
-    val = 2; /* Always spawn 2 in tests for consistency */
+    val = 2;
 #else
     rand_index = empty_indices[rand() % count];
     val = (rand() % 10 < 9) ? 2 : 4; /* 90% chance of 2 */
@@ -107,7 +116,7 @@ int game_slide(GameState *state, int dir)
 
     /* Process 4 rows or columns */
     for (i = 0; i < 4; i++) {
-        /* 1. Extract line based on direction */
+        /* Extract line based on direction */
         for (j = 0; j < 4; j++) {
             int idx = 0;
             if (dir == DIR_LEFT)
@@ -122,10 +131,10 @@ int game_slide(GameState *state, int dir)
             line[j] = state->board[idx];
         }
 
-        /* 2. Process logic */
+        /* Process logic */
         turn_score += merge_line(line);
 
-        /* 3. Write back */
+        /* Write back */
         for (j = 0; j < 4; j++) {
             int idx = 0;
             if (dir == DIR_LEFT)
@@ -151,6 +160,12 @@ int game_slide(GameState *state, int dir)
 
     if (changed) {
         state->score += turn_score;
+
+        /* Update High Score immediately */
+        if (state->score > state->high_score) {
+            state->high_score = state->score;
+        }
+
         /* Check for 2048 tile to set Win state */
         for (i = 0; i < 16; i++) {
             if (state->board[i] == 2048 && state->status != GAME_WON) {

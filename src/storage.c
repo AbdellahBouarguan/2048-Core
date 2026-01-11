@@ -12,7 +12,8 @@
 /* File Format Constants */
 /* 0x474D324B = 'G', 'M', '2', 'K' */
 static const unsigned long MAGIC_NUMBER = 0x474D324B;
-static const unsigned char FILE_VERSION = 1;
+/* Bumped version to 2 to support GameState struct change (added high_score) */
+static const unsigned char FILE_VERSION = 2;
 static const char *FILENAME = "save.dat";
 static const char *TMP_FILENAME = "save.tmp";
 
@@ -81,7 +82,7 @@ int storage_save(const char *base_path, const GameState *state)
         return STORAGE_ERR_WRITE;
     }
 
-    /* 5. Write Payload */
+    /* 5. Write Payload (Handles new high_score automatically via sizeof) */
     if (fwrite(state, sizeof(GameState), 1, fp) != 1) {
         fclose(fp);
         return STORAGE_ERR_WRITE;
@@ -114,6 +115,11 @@ int storage_load(const char *base_path, GameState *state)
     unsigned long magic_in, checksum_in, checksum_calc;
     unsigned char ver_in;
 
+    /* Safety: Zero out state first.
+     * This ensures high_score is 0 if loading fails or version is mismatched.
+     */
+    memset(state, 0, sizeof(GameState));
+
     build_path(final_path, base_path, FILENAME);
 
     /* 1. Open File */
@@ -134,7 +140,9 @@ int storage_load(const char *base_path, GameState *state)
     }
     if (ver_in != FILE_VERSION) {
         fclose(fp);
-        return STORAGE_ERR_VERSION; /* Older or newer version handling needed */
+        /* Rejecting old versions ensures we don't load corrupt/misaligned data
+         * into the new struct layout. Caller will init a fresh game. */
+        return STORAGE_ERR_VERSION;
     }
 
     /* 4. Read Payload */
@@ -154,8 +162,8 @@ int storage_load(const char *base_path, GameState *state)
     /* 6. Validate Data Integrity */
     checksum_calc = calculate_checksum(state);
     if (checksum_calc != checksum_in) {
-        /* Zero out state to prevent playing with corrupted data */
-        game_init(state);
+        /* Zero out state again to prevent usage of corrupted data */
+        memset(state, 0, sizeof(GameState));
         return STORAGE_ERR_CORRUPT;
     }
 

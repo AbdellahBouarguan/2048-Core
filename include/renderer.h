@@ -5,39 +5,56 @@
  * Project: 2048-Core
  * File: include/renderer.h
  * Standard: ANSI C (C89)
- * Description: Hardware-accelerated rendering interface (SDL2).
+ * Description: Hardware-accelerated rendering interface with Animation support.
  * ============================================================================== */
 
 #include "game_logic.h"
 #include <SDL.h>
 
 /**
+ * @struct VisualTile
+ * @brief Internal visual state for interpolation/animation.
+ */
+typedef struct {
+    float current_scale; /* 0.0f to 1.0f (animation progress) */
+    float target_scale;  /* 0.0f (hidden) or 1.0f (shown) */
+    int displayed_value; /* The number currently being rendered */
+} VisualTile;
+
+/**
  * @struct RendererContext
- * @brief Holds the SDL pointers required for rendering.
+ * @brief Holds the SDL pointers and visual state required for rendering.
  */
 typedef struct {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *atlas;
+    VisualTile visual_board[16]; /* NEW: Animation Layer */
 } RendererContext;
 
 /**
  * @brief Initializes the SDL video subsystem, window, and loads assets.
- * @param ctx Pointer to the context structure to initialize.
- * @return 0 on success, -1 on failure.
  */
 int renderer_init(RendererContext *ctx);
 
 /**
- * @brief Renders the current game state to the screen.
+ * @brief Updates the visual_board interpolation based on delta time (dt).
+ * @param ctx Pointer to the renderer context.
+ * @param state Pointer to the logical game state (target values).
+ * @param dt Delta time in seconds since last frame.
+ */
+void renderer_update_animations(RendererContext *ctx, const GameState *state, float dt);
+
+/**
+ * @brief Renders the current game state to the screen based on AppState.
  * @param ctx Pointer to the initialized renderer context.
  * @param state Read-only pointer to the current game state.
+ * @param app_state Current state of the FSM (Menu, Playing, GameOver).
  */
-void renderer_draw(RendererContext *ctx, const GameState *state);
+void renderer_draw(RendererContext *ctx, const GameState *state, AppState app_state);
 
 /**
  * @brief Cleans up all SDL resources.
- * @param ctx Pointer to the context to destroy.
  */
 void renderer_cleanup(RendererContext *ctx);
 
