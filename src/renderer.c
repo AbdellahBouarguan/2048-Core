@@ -262,57 +262,76 @@ int renderer_init(RendererContext *ctx)
     return 0;
 }
 
-void renderer_draw(RendererContext *ctx, const GameState *state)
+/* Update signature to match header */
+void renderer_draw(RendererContext *ctx, const GameState *state, AppState app_state)
 {
     int i, row, col, val;
     SDL_Rect rect;
     Color c_bg;
     Color c_text;
-
     /* Fixed Colors */
-    Color c_score = {119, 110, 101}; /* Dark Grey for Score */
+    Color c_score = {119, 110, 101};
 
     /* Layout Variables */
     int score_y_pos = 20;
-    int effective_start_y = START_Y + 30; /* Shift board down */
+    int effective_start_y = START_Y + 30;
 
-    /* 1. Clear Screen (Background Color: #FAF8EF) */
+    /* 1. Clear Screen */
     SDL_SetRenderDrawColor(ctx->renderer, 250, 248, 239, 255);
     SDL_RenderClear(ctx->renderer);
 
-    /* 2. Draw Score (Top Center) */
-    /* We pass 0 for size_override to indicate Score Logic */
-    draw_number(ctx->renderer, (int)state->score, 0, score_y_pos, SCREEN_WIDTH, 0, c_score);
+    /* 2. State-Based Rendering */
+    if (app_state == STATE_MENU) {
+        /* Draw Title Screen */
+        draw_number(ctx->renderer, 2048, 0, SCREEN_HEIGHT / 3, SCREEN_WIDTH, 0, c_score);
+        /* (Optional: Add "Press Enter" text here if you have a font system) */
+    } else {
+        /* STATE_PLAYING or STATE_GAMEOVER */
 
-    /* 3. Draw Board Background Container (#BBADA0) */
-    SDL_SetRenderDrawColor(ctx->renderer, 187, 173, 160, 255);
-    rect.x = START_X;
-    rect.y = effective_start_y;
-    rect.w = BOARD_SIZE;
-    rect.h = BOARD_SIZE;
-    SDL_RenderFillRect(ctx->renderer, &rect);
+        /* Draw Score */
+        draw_number(ctx->renderer, (int)state->score, 0, score_y_pos, SCREEN_WIDTH, 0, c_score);
 
-    /* 4. Draw Tiles */
-    for (i = 0; i < 16; i++) {
-        row = i / 4;
-        col = i % 4;
-        val = state->board[i];
-
-        rect.x = START_X + TILE_MARGIN + (col * (TILE_SIZE + TILE_MARGIN));
-        rect.y = effective_start_y + TILE_MARGIN + (row * (TILE_SIZE + TILE_MARGIN));
-        rect.w = TILE_SIZE;
-        rect.h = TILE_SIZE;
-
-        /* Draw Tile Background */
-        c_bg = get_tile_color(val);
-        SDL_SetRenderDrawColor(ctx->renderer, c_bg.r, c_bg.g, c_bg.b, 255);
+        /* Draw Board Background */
+        SDL_SetRenderDrawColor(ctx->renderer, 187, 173, 160, 255);
+        rect.x = START_X;
+        rect.y = effective_start_y;
+        rect.w = BOARD_SIZE;
+        rect.h = BOARD_SIZE;
         SDL_RenderFillRect(ctx->renderer, &rect);
 
-        /* Draw Number */
-        if (val > 0) {
-            c_text = get_tile_text_color(val);
-            /* Pass TILE_SIZE as size_override to indicate Tile Logic (centering/scaling) */
-            draw_number(ctx->renderer, val, rect.x, rect.y, TILE_SIZE, TILE_SIZE, c_text);
+        /* Draw Tiles */
+        for (i = 0; i < 16; i++) {
+            row = i / 4;
+            col = i % 4;
+            val = state->board[i];
+
+            rect.x = START_X + TILE_MARGIN + (col * (TILE_SIZE + TILE_MARGIN));
+            rect.y = effective_start_y + TILE_MARGIN + (row * (TILE_SIZE + TILE_MARGIN));
+            rect.w = TILE_SIZE;
+            rect.h = TILE_SIZE;
+
+            /* Draw Tile Background */
+            c_bg = get_tile_color(val);
+            SDL_SetRenderDrawColor(ctx->renderer, c_bg.r, c_bg.g, c_bg.b, 255);
+            SDL_RenderFillRect(ctx->renderer, &rect);
+
+            /* Draw Number */
+            if (val > 0) {
+                c_text = get_tile_text_color(val);
+                draw_number(ctx->renderer, val, rect.x, rect.y, TILE_SIZE, TILE_SIZE, c_text);
+            }
+        }
+
+        /* 3. Game Over Overlay */
+        if (app_state == STATE_GAMEOVER) {
+            SDL_SetRenderDrawBlendMode(ctx->renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(ctx->renderer, 238, 228, 218, 180); /* Faded yellow overlay */
+            rect.x = 0;
+            rect.y = 0;
+            rect.w = SCREEN_WIDTH;
+            rect.h = SCREEN_HEIGHT;
+            SDL_RenderFillRect(ctx->renderer, &rect);
+            /* Draw "Game Over" text if possible, or just the overlay for now */
         }
     }
 
