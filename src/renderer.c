@@ -8,6 +8,9 @@
 #include "renderer.h"
 #include <stdio.h>
 
+#include <math.h>
+#include <string.h>
+
 /* Constants for layout */
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
@@ -43,6 +46,12 @@ typedef struct {
 /* ==============================================================================
  * 2. Helper Functions
  * ============================================================================== */
+
+/* Linear Interpolation Helper */
+static float lerp(float start, float end, float t)
+{
+    return start + t * (end - start);
+}
 
 /* Get background color for a specific tile value */
 static Color get_tile_color(int value)
@@ -230,6 +239,10 @@ static void draw_number(SDL_Renderer *renderer, int value, int x, int y, int are
 
 int renderer_init(RendererContext *ctx)
 {
+
+    /* Zero out context to prevent visual glitches (garbage data in visual_board) */
+    memset(ctx, 0, sizeof(RendererContext));
+
     /* Initialize SDL Video */
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -260,6 +273,35 @@ int renderer_init(RendererContext *ctx)
 
     ctx->atlas = NULL; /* Not using textures anymore */
     return 0;
+}
+
+void renderer_update_animations(RendererContext *ctx, const GameState *state, float dt)
+{
+    int i;
+    float speed = 15.0f * dt; /* Animation speed factor */
+
+    for (i = 0; i < 16; i++) {
+        /* 1. Determine Target State */
+        if (state->board[i] > 0) {
+            ctx->visual_board[i].target_scale = 1.0f;
+            ctx->visual_board[i].displayed_value = state->board[i];
+        } else {
+            ctx->visual_board[i].target_scale = 0.0f;
+        }
+
+        /* 2. Interpolate Current Scale */
+        /* Clamp t to 1.0f to prevent overshooting if dt is large */
+        if (speed > 1.0f)
+            speed = 1.0f;
+
+        ctx->visual_board[i].current_scale =
+            lerp(ctx->visual_board[i].current_scale, ctx->visual_board[i].target_scale, speed);
+
+        /* Snap to target if very close to avoid floating point drift */
+        if (fabs(ctx->visual_board[i].target_scale - ctx->visual_board[i].current_scale) < 0.01f) {
+            ctx->visual_board[i].current_scale = ctx->visual_board[i].target_scale;
+        }
+    }
 }
 
 /* Update signature to match header */
