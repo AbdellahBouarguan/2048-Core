@@ -284,6 +284,12 @@ void renderer_update_animations(RendererContext *ctx, const GameState *state, fl
     float speed_pos = 20.0f * dt;   /* Sliding speed */
     float speed_scale = 15.0f * dt; /* Scaling speed */
 
+    /* [FIX] Clamp interpolation factors to 1.0 to prevent overshooting */
+    if (speed_pos > 1.0f)
+        speed_pos = 1.0f;
+    if (speed_scale > 1.0f)
+        speed_scale = 1.0f;
+
     for (i = 0; i < 16; i++) {
         /* 1. Position Interpolation (Slide) */
         ctx->visual_board[i].x =
