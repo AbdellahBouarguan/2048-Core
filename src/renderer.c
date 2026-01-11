@@ -6,9 +6,8 @@
  * ============================================================================== */
 
 #include "renderer.h"
-#include <stdio.h>
-
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 /* Constants for layout */
@@ -21,48 +20,45 @@ static int TILE_SIZE = 0;
 static int BOARD_SIZE = 0;
 static int START_X = 0;
 static int START_Y = 0;
+static int EFFECTIVE_START_Y = 0;
 
 /* ==============================================================================
- * 1. Embedded Assets: 5x5 Pixel Font
- * Each byte represents a row of pixels (bitmask).
+ * 1. Embedded Assets (Font) & Helpers
  * ============================================================================== */
 static const unsigned char FONT[10][5] = {
-    {0x1F, 0x11, 0x11, 0x11, 0x1F}, /* 0 */
-    {0x04, 0x0C, 0x04, 0x04, 0x0E}, /* 1 */
-    {0x1F, 0x01, 0x1F, 0x10, 0x1F}, /* 2 */
-    {0x1F, 0x01, 0x0F, 0x01, 0x1F}, /* 3 */
-    {0x11, 0x11, 0x1F, 0x01, 0x01}, /* 4 */
-    {0x1F, 0x10, 0x1F, 0x01, 0x1F}, /* 5 */
-    {0x1F, 0x10, 0x1F, 0x11, 0x1F}, /* 6 */
-    {0x1F, 0x01, 0x02, 0x04, 0x04}, /* 7 */
-    {0x1F, 0x11, 0x1F, 0x11, 0x1F}, /* 8 */
-    {0x1F, 0x11, 0x1F, 0x01, 0x1F}  /* 9 */
-};
+    {0x1F, 0x11, 0x11, 0x11, 0x1F}, {0x04, 0x0C, 0x04, 0x04, 0x0E}, {0x1F, 0x01, 0x1F, 0x10, 0x1F},
+    {0x1F, 0x01, 0x0F, 0x01, 0x1F}, {0x11, 0x11, 0x1F, 0x01, 0x01}, {0x1F, 0x10, 0x1F, 0x01, 0x1F},
+    {0x1F, 0x10, 0x1F, 0x11, 0x1F}, {0x1F, 0x01, 0x02, 0x04, 0x04}, {0x1F, 0x11, 0x1F, 0x11, 0x1F},
+    {0x1F, 0x11, 0x1F, 0x01, 0x1F}};
 
 typedef struct {
     Uint8 r, g, b;
 } Color;
 
-/* ==============================================================================
- * 2. Helper Functions
- * ============================================================================== */
-
-/* Linear Interpolation Helper */
 static float lerp(float start, float end, float t)
 {
     return start + t * (end - start);
 }
 
-/* Get background color for a specific tile value */
+/* Helper to get grid pixel coordinates */
+static void get_tile_pos(int index, float *x, float *y)
+{
+    int row = index / 4;
+    int col = index % 4;
+    *x = (float)(START_X + TILE_MARGIN + (col * (TILE_SIZE + TILE_MARGIN)));
+    *y = (float)(EFFECTIVE_START_Y + TILE_MARGIN + (row * (TILE_SIZE + TILE_MARGIN)));
+}
+
 static Color get_tile_color(int value)
 {
-    Color c;
+    /* Same color logic as before */
+    Color c = {60, 58, 50};
     switch (value) {
     case 0:
         c.r = 205;
         c.g = 193;
         c.b = 180;
-        break; /* Empty */
+        break;
     case 2:
         c.r = 238;
         c.g = 228;
@@ -148,9 +144,7 @@ static void draw_digit(SDL_Renderer *renderer, int digit, int x, int y, int size
 {
     int row, col;
     SDL_Rect pixel_rect;
-
     SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
-
     for (row = 0; row < 5; row++) {
         for (col = 0; col < 5; col++) {
             /* Check if the bit at this column is set */
@@ -178,23 +172,15 @@ static void draw_number(SDL_Renderer *renderer, int value, int x, int y, int are
     int temp = value;
     int digits[10]; /* Store digits in reverse order */
     int count = 0;
-    int i;
-    int pixel_scale;
-    int digit_width;
-    int digit_spacing;
-    int total_width;
-    int start_draw_x;
-    int start_draw_y;
+    int i, pixel_scale, digit_width, digit_spacing, total_width, start_draw_x, start_draw_y;
 
-    /* Handle 0 explicitly so it draws */
-    if (value == 0) {
+    if (value == 0)
         digits[count++] = 0;
-    } else {
+    else
         while (temp > 0) {
             digits[count++] = temp % 10;
             temp /= 10;
         }
-    }
 
     /* Determine Scale and Layout */
     if (size_override > 0) {
@@ -206,10 +192,8 @@ static void draw_number(SDL_Renderer *renderer, int value, int x, int y, int are
             pixel_scale = 2;
         if (value > 10000)
             pixel_scale = 1;
-
         digit_width = 5 * pixel_scale;
         digit_spacing = 2 * pixel_scale;
-
         total_width = (count * digit_width) + ((count - 1) * digit_spacing);
         /* Center in Tile */
         start_draw_x = x + (area_w - total_width) / 2;
@@ -219,7 +203,6 @@ static void draw_number(SDL_Renderer *renderer, int value, int x, int y, int are
         pixel_scale = 4;
         digit_width = 5 * pixel_scale;
         digit_spacing = 2 * pixel_scale;
-
         total_width = (count * digit_width) + ((count - 1) * digit_spacing);
         /* Center Horizontally in Screen */
         start_draw_x = x + (area_w - total_width) / 2;
@@ -239,30 +222,22 @@ static void draw_number(SDL_Renderer *renderer, int value, int x, int y, int are
 
 int renderer_init(RendererContext *ctx)
 {
-    int i, row, col;
-    int effective_start_y;
-
-    /* Zero out context to prevent visual glitches (garbage data in visual_board) */
+    int i;
     memset(ctx, 0, sizeof(RendererContext));
 
-    /* Initialize SDL Video */
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    if (SDL_Init(SDL_INIT_VIDEO) < 0)
         return -1;
-    }
 
     /* Create Window */
     ctx->window =
-        SDL_CreateWindow("2048-Core (Procedural)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        SDL_CreateWindow("2048-Core (Animated)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                          SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
-
     if (!ctx->window)
         return -1;
 
     /* Create Renderer */
     ctx->renderer =
         SDL_CreateRenderer(ctx->window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-
     if (!ctx->renderer)
         return -1;
 
@@ -272,124 +247,147 @@ int renderer_init(RendererContext *ctx)
     TILE_SIZE = (BOARD_SIZE - (5 * TILE_MARGIN)) / 4;
     START_X = (SCREEN_WIDTH - BOARD_SIZE) / 2;
     START_Y = (SCREEN_HEIGHT - BOARD_SIZE) / 2;
-    effective_start_y = START_Y + 30; /* Match the vertical offset used in renderer_draw */
+    EFFECTIVE_START_Y = START_Y + 30;
 
-    /* Initialize VisualTile Positions */
     for (i = 0; i < 16; i++) {
-        row = i / 4;
-        col = i % 4;
-        ctx->visual_board[i].x = (float)(START_X + TILE_MARGIN + (col * (TILE_SIZE + TILE_MARGIN)));
-        ctx->visual_board[i].y =
-            (float)(effective_start_y + TILE_MARGIN + (row * (TILE_SIZE + TILE_MARGIN)));
+        float tx, ty;
+        get_tile_pos(i, &tx, &ty);
+        ctx->visual_board[i].x = tx;
+        ctx->visual_board[i].y = ty;
+        ctx->visual_board[i].target_x = tx;
+        ctx->visual_board[i].target_y = ty;
         ctx->visual_board[i].current_scale = 0.0f;
     }
 
-    ctx->atlas = NULL; /* Not using textures anymore */
     return 0;
+}
+
+void renderer_notify_move(RendererContext *ctx, int from_index, int to_index, int merged)
+{
+    (void)merged; /* Silence unused parameter warning */
+    /* Copy visual state from 'from' to 'to' to initiate slide.
+     * Even if merged is true, we visually slide the incoming tile to the target.
+     */
+    ctx->visual_board[to_index] = ctx->visual_board[from_index];
+
+    /* Set the NEW target position based on destination index */
+    get_tile_pos(to_index, &ctx->visual_board[to_index].target_x,
+                 &ctx->visual_board[to_index].target_y);
+
+    /* Keep the 'from' pixel coordinates as current x/y so it slides from there */
+    /* (This is implicitly done by the struct copy above) */
 }
 
 void renderer_update_animations(RendererContext *ctx, const GameState *state, float dt)
 {
     int i;
-    float speed = 15.0f * dt; /* Animation speed factor */
+    float speed_pos = 20.0f * dt;   /* Sliding speed */
+    float speed_scale = 15.0f * dt; /* Scaling speed */
 
     for (i = 0; i < 16; i++) {
-        /* 1. Determine Target State */
+        /* 1. Position Interpolation (Slide) */
+        ctx->visual_board[i].x =
+            lerp(ctx->visual_board[i].x, ctx->visual_board[i].target_x, speed_pos);
+        ctx->visual_board[i].y =
+            lerp(ctx->visual_board[i].y, ctx->visual_board[i].target_y, speed_pos);
+
+        /* Snap position if close */
+        if (fabs(ctx->visual_board[i].target_x - ctx->visual_board[i].x) < 0.5f)
+            ctx->visual_board[i].x = ctx->visual_board[i].target_x;
+        if (fabs(ctx->visual_board[i].target_y - ctx->visual_board[i].y) < 0.5f)
+            ctx->visual_board[i].y = ctx->visual_board[i].target_y;
+
+        /* 2. Scale and Value Management */
         if (state->board[i] > 0) {
             ctx->visual_board[i].target_scale = 1.0f;
+            /* Update displayed value.
+             * Note: In a polished version, this might wait until slide finishes for merges,
+             * but immediate update is acceptable for this scope. */
             ctx->visual_board[i].displayed_value = state->board[i];
         } else {
+            /* If the board logic says it's 0, we shrink it.
+             * Unless it's currently sliding?
+             * For the core logic, if it is 0, it means it's empty or moved away. */
+
+            /* Check if this slot is the DESTINATION of a move.
+             * If so, the board value is > 0 (handled above).
+             * If it is 0, it is truly empty. */
             ctx->visual_board[i].target_scale = 0.0f;
         }
 
-        /* 2. Interpolate Current Scale */
-        /* Clamp t to 1.0f to prevent overshooting if dt is large */
-        if (speed > 1.0f)
-            speed = 1.0f;
+        /* Interpolate Scale */
+        if (speed_scale > 1.0f)
+            speed_scale = 1.0f;
+        ctx->visual_board[i].current_scale = lerp(ctx->visual_board[i].current_scale,
+                                                  ctx->visual_board[i].target_scale, speed_scale);
 
-        ctx->visual_board[i].current_scale =
-            lerp(ctx->visual_board[i].current_scale, ctx->visual_board[i].target_scale, speed);
-
-        /* Snap to target if very close to avoid floating point drift */
         if (fabs(ctx->visual_board[i].target_scale - ctx->visual_board[i].current_scale) < 0.01f) {
             ctx->visual_board[i].current_scale = ctx->visual_board[i].target_scale;
         }
     }
 }
 
-/* Update signature to match header */
 void renderer_draw(RendererContext *ctx, const GameState *state, AppState app_state)
 {
-    int i, row, col, val;
+    int i, val, size, offset;
+    float scale;
     SDL_Rect rect;
-    Color c_bg;
-    Color c_text;
-    /* Fixed Colors */
-    Color c_score = {119, 110, 101};
+    Color c_bg, c_text, c_score = {119, 110, 101};
 
-    /* Layout Variables */
-    int score_y_pos = 20;
-    int effective_start_y = START_Y + 30;
-
-    /* 1. Clear Screen */
     SDL_SetRenderDrawColor(ctx->renderer, 250, 248, 239, 255);
     SDL_RenderClear(ctx->renderer);
 
-    /* 2. State-Based Rendering */
     if (app_state == STATE_MENU) {
-        /* Draw Title Screen */
         draw_number(ctx->renderer, 2048, 0, SCREEN_HEIGHT / 3, SCREEN_WIDTH, 0, c_score);
-        /* (Optional: Add "Press Enter" text here if you have a font system) */
     } else {
-        /* STATE_PLAYING or STATE_GAMEOVER */
+        draw_number(ctx->renderer, (int)state->score, 0, 20, SCREEN_WIDTH, 0, c_score);
 
-        /* Draw Score */
-        draw_number(ctx->renderer, (int)state->score, 0, score_y_pos, SCREEN_WIDTH, 0, c_score);
-
-        /* Draw Board Background */
+        /* Draw Grid Background */
         SDL_SetRenderDrawColor(ctx->renderer, 187, 173, 160, 255);
         rect.x = START_X;
-        rect.y = effective_start_y;
+        rect.y = EFFECTIVE_START_Y;
         rect.w = BOARD_SIZE;
         rect.h = BOARD_SIZE;
         SDL_RenderFillRect(ctx->renderer, &rect);
 
-        /* Draw Tiles */
+        /* Draw Tiles using visual_board coordinates */
         for (i = 0; i < 16; i++) {
-            row = i / 4;
-            col = i % 4;
-            val = state->board[i];
+            /* Skip if effectively invisible */
+            if (ctx->visual_board[i].current_scale < 0.01f)
+                continue;
 
-            rect.x = START_X + TILE_MARGIN + (col * (TILE_SIZE + TILE_MARGIN));
-            rect.y = effective_start_y + TILE_MARGIN + (row * (TILE_SIZE + TILE_MARGIN));
-            rect.w = TILE_SIZE;
-            rect.h = TILE_SIZE;
+            val = ctx->visual_board[i].displayed_value;
 
-            /* Draw Tile Background */
+            /* Apply Scale centered on current X/Y */
+            scale = ctx->visual_board[i].current_scale;
+            size = (int)((float)TILE_SIZE * scale);
+            offset = (TILE_SIZE - size) / 2;
+
+            rect.x = (int)ctx->visual_board[i].x + offset;
+            rect.y = (int)ctx->visual_board[i].y + offset;
+            rect.w = size;
+            rect.h = size;
+
             c_bg = get_tile_color(val);
             SDL_SetRenderDrawColor(ctx->renderer, c_bg.r, c_bg.g, c_bg.b, 255);
             SDL_RenderFillRect(ctx->renderer, &rect);
 
-            /* Draw Number */
             if (val > 0) {
                 c_text = get_tile_text_color(val);
-                draw_number(ctx->renderer, val, rect.x, rect.y, TILE_SIZE, TILE_SIZE, c_text);
+                draw_number(ctx->renderer, val, rect.x, rect.y, size, size, c_text);
             }
         }
 
-        /* 3. Game Over Overlay */
         if (app_state == STATE_GAMEOVER) {
             SDL_SetRenderDrawBlendMode(ctx->renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(ctx->renderer, 238, 228, 218, 180); /* Faded yellow overlay */
+            SDL_SetRenderDrawColor(ctx->renderer, 238, 228, 218, 180);
             rect.x = 0;
             rect.y = 0;
             rect.w = SCREEN_WIDTH;
             rect.h = SCREEN_HEIGHT;
             SDL_RenderFillRect(ctx->renderer, &rect);
-            /* Draw "Game Over" text if possible, or just the overlay for now */
         }
     }
-
     SDL_RenderPresent(ctx->renderer);
 }
 

@@ -40,12 +40,10 @@ static void resolve_save_path(char *buffer, size_t max_len)
     const char *home = getenv("HOME");
     char path[512];
     struct stat st;
-
     if (home) {
         sprintf(path, "%s/.local/share/2048-core", home);
-        if (stat(path, &st) == -1) {
+        if (stat(path, &st) == -1)
             mkdir(path, 0700);
-        }
         strncpy(buffer, path, max_len);
     } else {
         strcpy(buffer, ".");
@@ -58,9 +56,8 @@ static void resolve_save_path(char *buffer, size_t max_len)
 /* Input Abstraction Layer */
 static InputCommand handle_input(SDL_Event *e)
 {
-    if (e->type == SDL_QUIT) {
+    if (e->type == SDL_QUIT)
         return INPUT_EXIT;
-    }
     if (e->type == SDL_KEYDOWN) {
         switch (e->key.keysym.sym) {
         case SDLK_UP:
@@ -101,7 +98,7 @@ int main(int argc, char *argv[])
     Uint32 frame_start;
     int frame_time;
 
-    /* Time management for Delta Time */
+    /* Time management */
     Uint32 last_time = 0;
     Uint32 current_time = 0;
     float dt = 0.0f;
@@ -109,15 +106,18 @@ int main(int argc, char *argv[])
     /* FSM State */
     AppState app_state = STATE_MENU;
     InputCommand cmd = INPUT_NONE;
-    InputCommand frame_cmd = INPUT_NONE; /* Capture last valid input per frame */
-    Uint32 game_over_timer = 0;          /* Timer for Game Over transition */
+    InputCommand frame_cmd = INPUT_NONE;
+    Uint32 game_over_timer = 0;
     int reset_flag = 0;
 
-    /* CLI Argument Parsing */
+    /* NEW: Event Buffer */
+    MoveEvent move_events[32]; /* Max 16 moves + merges, 32 is safe */
+    int move_event_count = 0;
+
     for (i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--reset") == 0) {
+        if (strcmp(argv[i], "--reset") == 0)
             reset_flag = 1;
-        } else if (strcmp(argv[i], "--version") == 0) {
+        else if (strcmp(argv[i], "--version") == 0) {
             printf("2048-Core v%s\n", APP_VERSION);
             return 0;
         }
@@ -126,7 +126,6 @@ int main(int argc, char *argv[])
     /* Initialization */
     srand((unsigned int)time(NULL));
     resolve_save_path(save_path, sizeof(save_path));
-    printf("[System] Save Path: %s\n", save_path);
 
     if (renderer_init(&ctx) != 0) {
         fprintf(stderr, "[Fatal] Renderer failed to initialize.\n");
@@ -153,10 +152,8 @@ int main(int argc, char *argv[])
     /* The Game Loop (FSM Refactor) */
     while (running) {
         frame_start = SDL_GetTicks();
-
-        /* Calculate Delta Time (in seconds) */
         current_time = frame_start;
-        dt = ((float)(current_time - last_time)) / 1000.0f;
+        dt = (float)(current_time - last_time) / 1000.0f;
         last_time = current_time;
 
         frame_cmd = INPUT_NONE;
@@ -164,32 +161,26 @@ int main(int argc, char *argv[])
         /* Input Polling */
         while (SDL_PollEvent(&event)) {
             cmd = handle_input(&event);
-            if (cmd == INPUT_EXIT) {
+            if (cmd == INPUT_EXIT)
                 running = 0;
-            } else if (cmd != INPUT_NONE) {
+            else if (cmd != INPUT_NONE)
                 frame_cmd = cmd;
-            }
         }
 
         /* State Machine Logic */
         switch (app_state) {
         case STATE_MENU:
             if (frame_cmd == INPUT_CONFIRM) {
-                /* Check if board is empty, if so, spawn tiles */
                 int has_tiles = 0;
-                for (i = 0; i < 16; i++) {
+                for (i = 0; i < 16; i++)
                     if (state.board[i] != 0)
                         has_tiles = 1;
-                }
-
                 if (!has_tiles) {
                     game_init(&state);
                     game_spawn_tile(&state);
                     game_spawn_tile(&state);
                 }
-
                 app_state = STATE_PLAYING;
-                printf("[FSM] Switching to STATE_PLAYING\n");
             }
             break;
 
@@ -197,41 +188,40 @@ int main(int argc, char *argv[])
             /* Handle Move Inputs */
             {
                 int moved = 0;
+                move_event_count = 0;
+
                 if (frame_cmd == INPUT_UP)
-                    moved = game_slide(&state, DIR_UP);
+                    moved = game_slide(&state, DIR_UP, move_events, &move_event_count);
                 else if (frame_cmd == INPUT_DOWN)
-                    moved = game_slide(&state, DIR_DOWN);
+                    moved = game_slide(&state, DIR_DOWN, move_events, &move_event_count);
                 else if (frame_cmd == INPUT_LEFT)
-                    moved = game_slide(&state, DIR_LEFT);
+                    moved = game_slide(&state, DIR_LEFT, move_events, &move_event_count);
                 else if (frame_cmd == INPUT_RIGHT)
-                    moved = game_slide(&state, DIR_RIGHT);
+                    moved = game_slide(&state, DIR_RIGHT, move_events, &move_event_count);
 
                 if (moved) {
+                    /* Process Animation Events */
+                    for (i = 0; i < move_event_count; i++) {
+                        renderer_notify_move(&ctx, move_events[i].from_index,
+                                             move_events[i].to_index, move_events[i].merged);
+                    }
+
                     game_spawn_tile(&state);
                     storage_save(save_path, &state);
-                    /* Reset timer if a move was successful (rare edge case if game was thought
-                     * over) */
                     game_over_timer = 0;
                 }
 
-                /* Check Game Over Logic */
                 if (game_check_over(&state)) {
-                    if (game_over_timer == 0) {
-                        printf("[Game] Check Over True. Starting Timer.\n");
+                    if (game_over_timer == 0)
                         game_over_timer = SDL_GetTicks();
-                    }
-
-                    /* Wait 1 second before switching */
                     if (SDL_GetTicks() - game_over_timer > 1000) {
                         state.status = GAME_OVER;
                         app_state = STATE_GAMEOVER;
-                        printf("[FSM] Switching to STATE_GAMEOVER\n");
                     }
                 } else {
                     game_over_timer = 0;
                 }
 
-                /* Allow manual reset during play */
                 if (frame_cmd == INPUT_RESET) {
                     game_init(&state);
                     game_spawn_tile(&state);
@@ -249,7 +239,6 @@ int main(int argc, char *argv[])
                 game_spawn_tile(&state);
                 storage_save(save_path, &state);
                 app_state = STATE_PLAYING;
-                printf("[FSM] Restarting Game -> STATE_PLAYING\n");
             }
             break;
         }
@@ -265,9 +254,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    /* 5. Shutdown */
     renderer_cleanup(&ctx);
-    printf("[System] Shutdown complete.\n");
-
     return 0;
 }

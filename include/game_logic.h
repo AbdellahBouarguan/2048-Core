@@ -29,6 +29,13 @@ typedef enum {
     INPUT_EXIT     /* ESC or Back button */
 } InputCommand;
 
+/* NEW: Event structure for animation system */
+typedef struct {
+    int from_index;
+    int to_index;
+    int merged; /* boolean: 1 if this move resulted in a merge */
+} MoveEvent;
+
 /**
  * @struct GameState
  * @brief Holds the entire state of the 2048 game session.
@@ -66,9 +73,11 @@ void game_spawn_tile(GameState *state);
  * @brief slides tiles in the specified direction and merges adjacent equals.
  * @param state Pointer to the GameState object.
  * @param dir Direction to move (DIR_UP, DIR_DOWN, DIR_LEFT, DIR_RIGHT).
+ * @param events Buffer to store move events (can be NULL).
+ * @param event_count Pointer to integer to write the number of events (can be NULL).
  * @return 1 if the board changed, 0 if the move was invalid (no change).
  */
-int game_slide(GameState *state, int dir);
+int game_slide(GameState *state, int dir, MoveEvent *events, int *event_count);
 
 /**
  * @brief Checks if the game is over (no empty slots and no adjacent merges).

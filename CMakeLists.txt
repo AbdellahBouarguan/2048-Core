@@ -114,21 +114,40 @@ set_target_properties(core_logic PROPERTIES
 # ==============================================================================
 # 8. Unit Testing
 # ==============================================================================
-add_executable(run_tests tests/test_logic.c)
+# Add src/renderer.c and src/storage.c so we can test them
+add_executable(run_tests 
+    tests/test_logic.c 
+    src/renderer.c 
+    src/storage.c
+)
 
-# Link core logic (No SDL)
-target_link_libraries(run_tests PRIVATE core_logic)
-target_compile_definitions(run_tests PRIVATE TEST_MODE)
+# Include SDL2 headers so renderer.h can be compiled
+target_include_directories(run_tests PRIVATE 
+    include
+    libs/SDL2/include
+)
 
-# Apply Strict C89 to the tests as well
+# Link SDL2 (needed because renderer.c uses SDL symbols)
+# We also link 'm' (math), 'dl', and 'pthread' as SDL dependencies
+target_link_libraries(run_tests PRIVATE 
+    core_logic 
+    SDL2-static 
+    m 
+    dl 
+    pthread
+)
+
+# Apply Strict C89
 set_target_properties(run_tests PROPERTIES
     C_STANDARD 90
     C_STANDARD_REQUIRED ON
     C_EXTENSIONS OFF
 )
 
+target_compile_definitions(run_tests PRIVATE TEST_MODE)
+
 add_custom_target(test_logic 
     COMMAND run_tests
     DEPENDS run_tests
-    COMMENT "Running Logic Unit Tests..."
+    COMMENT "Running Unit Tests..."
 )

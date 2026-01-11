@@ -8,12 +8,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Internal Helper: Processes a single line of 4 integers (standard 2048 rule).
+/* Internal Helper Structure for tracking movement origins */
+typedef struct {
+    int val;
+    int original_index;    /* Where this value came from */
+    int merged_from_index; /* If merged, the index of the second tile (secondary source) */
+} TileReq;
+
+/* * Helper: Processes a single line of 4 TileReqs.
  * Returns score increase.
  * The 'line' array is modified in place.
- * 'line[0]' is the 'farthest' tile (the wall we are sliding towards).
  */
-static unsigned long merge_line(int *line)
+static unsigned long merge_line_tracked(TileReq *line)
 {
     int i, target;
     unsigned long score_inc = 0;
@@ -21,10 +27,12 @@ static unsigned long merge_line(int *line)
     /* Step 1: Compress (Move non-zeros to front) */
     target = 0;
     for (i = 0; i < 4; i++) {
-        if (line[i] != 0) {
+        if (line[i].val != 0) {
             line[target] = line[i];
             if (target != i) {
-                line[i] = 0;
+                line[i].val = 0;
+                line[i].original_index = -1;
+                line[i].merged_from_index = -1;
             }
             target++;
         }
@@ -32,20 +40,32 @@ static unsigned long merge_line(int *line)
 
     /* Step 2: Merge adjacent equals */
     for (i = 0; i < 3; i++) {
-        if (line[i] != 0 && line[i] == line[i + 1]) {
-            line[i] *= 2;
-            line[i + 1] = 0;
-            score_inc += (unsigned long)line[i];
+        if (line[i].val != 0 && line[i].val == line[i + 1].val) {
+            line[i].val *= 2;
+            /* Record the merge source.
+             * line[i] keeps its original_index (primary source).
+             * We record line[i+1]'s original_index as the secondary source.
+             */
+            line[i].merged_from_index = line[i + 1].original_index;
+
+            score_inc += (unsigned long)line[i].val;
+
+            /* Clear the merged tile */
+            line[i + 1].val = 0;
+            line[i + 1].original_index = -1;
+            line[i + 1].merged_from_index = -1;
         }
     }
 
     /* Step 3: Compress again */
     target = 0;
     for (i = 0; i < 4; i++) {
-        if (line[i] != 0) {
+        if (line[i].val != 0) {
             line[target] = line[i];
             if (target != i) {
-                line[i] = 0;
+                line[i].val = 0;
+                line[i].original_index = -1;
+                line[i].merged_from_index = -1;
             }
             target++;
         }
@@ -102,13 +122,14 @@ void game_spawn_tile(GameState *state)
     state->board[rand_index] = val;
 }
 
-int game_slide(GameState *state, int dir)
+int game_slide(GameState *state, int dir, MoveEvent *events, int *event_count)
 {
     int i, j;
-    int line[4];
+    TileReq line[4];
     int original_board[16];
     int changed = 0;
     unsigned long turn_score = 0;
+    int local_event_cnt = 0;
 
     /* Backup board to detect changes */
     for (i = 0; i < 16; i++)
@@ -128,26 +149,50 @@ int game_slide(GameState *state, int dir)
             else if (dir == DIR_DOWN)
                 idx = (3 - j) * 4 + i;
 
-            line[j] = state->board[idx];
+            line[j].val = state->board[idx];
+            line[j].original_index = idx;
+            line[j].merged_from_index = -1;
         }
 
-        /* Process logic */
-        turn_score += merge_line(line);
+        /* Process logic with tracking */
+        turn_score += merge_line_tracked(line);
 
-        /* Write back */
+        /* Write back and Generate Events */
         for (j = 0; j < 4; j++) {
-            int idx = 0;
+            int target_idx = 0;
             if (dir == DIR_LEFT)
-                idx = i * 4 + j;
+                target_idx = i * 4 + j;
             else if (dir == DIR_RIGHT)
-                idx = i * 4 + (3 - j);
+                target_idx = i * 4 + (3 - j);
             else if (dir == DIR_UP)
-                idx = j * 4 + i;
+                target_idx = j * 4 + i;
             else if (dir == DIR_DOWN)
-                idx = (3 - j) * 4 + i;
+                target_idx = (3 - j) * 4 + i;
 
-            state->board[idx] = line[j];
+            state->board[target_idx] = line[j].val;
+
+            /* Generate Events */
+            if (events && line[j].val != 0) {
+                /* Primary Move */
+                if (line[j].original_index != -1) {
+                    events[local_event_cnt].from_index = line[j].original_index;
+                    events[local_event_cnt].to_index = target_idx;
+                    events[local_event_cnt].merged = 0;
+                    local_event_cnt++;
+                }
+                /* Secondary Move (Merge source) */
+                if (line[j].merged_from_index != -1) {
+                    events[local_event_cnt].from_index = line[j].merged_from_index;
+                    events[local_event_cnt].to_index = target_idx;
+                    events[local_event_cnt].merged = 1;
+                    local_event_cnt++;
+                }
+            }
         }
+    }
+
+    if (event_count) {
+        *event_count = local_event_cnt;
     }
 
     /* Compare with original */
