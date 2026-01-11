@@ -19,6 +19,7 @@ typedef struct {
     float current_scale; /* 0.0f to 1.0f (animation progress) */
     float target_scale;  /* 0.0f (hidden) or 1.0f (shown) */
     int displayed_value; /* The number currently being rendered */
+    float x, y;          /* NEW: Current pixel position for sliding animations */
 } VisualTile;
 
 /**

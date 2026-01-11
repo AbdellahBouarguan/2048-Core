@@ -55,7 +55,7 @@ static void resolve_save_path(char *buffer, size_t max_len)
 #endif
 }
 
-/* [NEW] Input Abstraction Layer */
+/* Input Abstraction Layer */
 static InputCommand handle_input(SDL_Event *e)
 {
     if (e->type == SDL_QUIT) {
@@ -101,6 +101,11 @@ int main(int argc, char *argv[])
     Uint32 frame_start;
     int frame_time;
 
+    /* Time management for Delta Time */
+    Uint32 last_time = 0;
+    Uint32 current_time = 0;
+    float dt = 0.0f;
+
     /* FSM State */
     AppState app_state = STATE_MENU;
     InputCommand cmd = INPUT_NONE;
@@ -108,7 +113,7 @@ int main(int argc, char *argv[])
     Uint32 game_over_timer = 0;          /* Timer for Game Over transition */
     int reset_flag = 0;
 
-    /* 1. CLI Argument Parsing */
+    /* CLI Argument Parsing */
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--reset") == 0) {
             reset_flag = 1;
@@ -118,7 +123,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    /* 2. Initialization */
+    /* Initialization */
     srand((unsigned int)time(NULL));
     resolve_save_path(save_path, sizeof(save_path));
     printf("[System] Save Path: %s\n", save_path);
@@ -128,7 +133,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* 3. Game State Loading */
+    /* Game State Loading */
     if (reset_flag) {
         game_init(&state);
         game_spawn_tile(&state);
@@ -142,12 +147,21 @@ int main(int argc, char *argv[])
         }
     }
 
-    /* 4. The Game Loop (FSM Refactor) */
+    /* Initialize timing */
+    last_time = SDL_GetTicks();
+
+    /* The Game Loop (FSM Refactor) */
     while (running) {
         frame_start = SDL_GetTicks();
+
+        /* Calculate Delta Time (in seconds) */
+        current_time = frame_start;
+        dt = ((float)(current_time - last_time)) / 1000.0f;
+        last_time = current_time;
+
         frame_cmd = INPUT_NONE;
 
-        /* A. Input Polling */
+        /* Input Polling */
         while (SDL_PollEvent(&event)) {
             cmd = handle_input(&event);
             if (cmd == INPUT_EXIT) {
@@ -157,7 +171,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        /* B. State Machine Logic */
+        /* State Machine Logic */
         switch (app_state) {
         case STATE_MENU:
             if (frame_cmd == INPUT_CONFIRM) {
@@ -240,10 +254,11 @@ int main(int argc, char *argv[])
             break;
         }
 
-        /* C. Render */
+        /* Render */
+        renderer_update_animations(&ctx, &state, dt); /* NEW: Update Animations */
         renderer_draw(&ctx, &state, app_state);
 
-        /* D. Frame Rate Cap */
+        /* Frame Rate Cap */
         frame_time = (int)(SDL_GetTicks() - frame_start);
         if (FRAME_DELAY > frame_time) {
             SDL_Delay((Uint32)(FRAME_DELAY - frame_time));

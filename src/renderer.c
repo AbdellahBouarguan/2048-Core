@@ -239,6 +239,8 @@ static void draw_number(SDL_Renderer *renderer, int value, int x, int y, int are
 
 int renderer_init(RendererContext *ctx)
 {
+    int i, row, col;
+    int effective_start_y;
 
     /* Zero out context to prevent visual glitches (garbage data in visual_board) */
     memset(ctx, 0, sizeof(RendererContext));
@@ -270,6 +272,17 @@ int renderer_init(RendererContext *ctx)
     TILE_SIZE = (BOARD_SIZE - (5 * TILE_MARGIN)) / 4;
     START_X = (SCREEN_WIDTH - BOARD_SIZE) / 2;
     START_Y = (SCREEN_HEIGHT - BOARD_SIZE) / 2;
+    effective_start_y = START_Y + 30; /* Match the vertical offset used in renderer_draw */
+
+    /* Initialize VisualTile Positions */
+    for (i = 0; i < 16; i++) {
+        row = i / 4;
+        col = i % 4;
+        ctx->visual_board[i].x = (float)(START_X + TILE_MARGIN + (col * (TILE_SIZE + TILE_MARGIN)));
+        ctx->visual_board[i].y =
+            (float)(effective_start_y + TILE_MARGIN + (row * (TILE_SIZE + TILE_MARGIN)));
+        ctx->visual_board[i].current_scale = 0.0f;
+    }
 
     ctx->atlas = NULL; /* Not using textures anymore */
     return 0;
