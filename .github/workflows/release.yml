@@ -11,7 +11,7 @@ permissions:
 jobs:
   build-release:
     name: Build & Publish
-    runs-on: ubuntu-20.04 # Use older Linux for better compatibility (GLIBC 2.31)
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout Code
