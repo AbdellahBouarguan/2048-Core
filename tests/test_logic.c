@@ -373,6 +373,58 @@ void test_storage_corruption(void)
 }
 
 /* ==============================================================================
+ * 5. Input Logic Tests (Algorithm Verification)
+ * ============================================================================== */
+
+/* * Helper: Replicates the swipe detection logic from src/main.c
+ * to ensure the math and thresholds are correct.
+ */
+static InputCommand simulate_swipe(float start_x, float start_y, float end_x, float end_y)
+{
+    float dx = end_x - start_x;
+    float dy = end_y - start_y;
+
+    /* Threshold: 0.05f */
+    if (fabs((double)dx) > 0.05f || fabs((double)dy) > 0.05f) {
+        if (fabs((double)dx) > fabs((double)dy)) {
+            return (dx > 0) ? INPUT_RIGHT : INPUT_LEFT;
+        } else {
+            return (dy > 0) ? INPUT_DOWN : INPUT_UP;
+        }
+    }
+    return INPUT_NONE;
+}
+
+void test_swipe_algorithm(void)
+{
+    /* Test 1: Tap (Below threshold 0.05) -> Should be ignored */
+    ASSERT_INT_EQ(INPUT_NONE, simulate_swipe(0.5f, 0.5f, 0.52f, 0.52f), "Tap should be ignored");
+
+    /* Test 2: Pure Right Swipe */
+    ASSERT_INT_EQ(INPUT_RIGHT, simulate_swipe(0.1f, 0.5f, 0.8f, 0.5f), "Right Swipe");
+
+    /* Test 3: Pure Left Swipe */
+    ASSERT_INT_EQ(INPUT_LEFT, simulate_swipe(0.8f, 0.5f, 0.1f, 0.5f), "Left Swipe");
+
+    /* Test 4: Pure Up Swipe */
+    ASSERT_INT_EQ(INPUT_UP, simulate_swipe(0.5f, 0.8f, 0.5f, 0.1f), "Up Swipe");
+
+    /* Test 5: Pure Down Swipe */
+    ASSERT_INT_EQ(INPUT_DOWN, simulate_swipe(0.5f, 0.1f, 0.5f, 0.8f), "Down Swipe");
+
+    /* Test 6: Diagonal Swipe (Dominant X) -> Should be Horizontal */
+    /* dx = 0.4, dy = 0.2 */
+    ASSERT_INT_EQ(INPUT_RIGHT, simulate_swipe(0.1f, 0.1f, 0.5f, 0.3f),
+                  "Dominant X should be RIGHT");
+
+    /* Test 7: Diagonal Swipe (Dominant Y) -> Should be Vertical */
+    /* dx = 0.1, dy = 0.4 */
+    ASSERT_INT_EQ(INPUT_DOWN, simulate_swipe(0.1f, 0.1f, 0.2f, 0.5f), "Dominant Y should be DOWN");
+
+    printf("  %s[PASS]%s\n", ANSI_COLOR_GREEN, ANSI_COLOR_RESET);
+}
+
+/* ==============================================================================
  * 5. Main Runner
  * ============================================================================== */
 
@@ -400,6 +452,9 @@ int main(void)
     run_test(test_storage_save_load, "Storage: Save/Load Integrity");
     run_test(test_storage_not_found, "Storage: Error Handling (Not Found)");
     run_test(test_storage_corruption, "Storage: Corruption Detection");
+
+    /* Input Tests */
+    run_test(test_swipe_algorithm, "Input: Swipe Algorithm Verification");
 
     printf("==========================================\n");
     printf("Tests Run: %d\n", g_tests_run);
