@@ -11,9 +11,12 @@
 #include <string.h>
 
 /* Constants for layout */
-#define SCREEN_WIDTH 800
-#define SCREEN_HEIGHT 600
+/* #define SCREEN_WIDTH 800
+#define SCREEN_HEIGHT 600 */
 #define TILE_MARGIN 12
+
+static int current_screen_width = 800;
+static int current_screen_height = 600;
 
 /* Calculated at runtime based on screen size */
 static int TILE_SIZE = 0;
@@ -292,6 +295,22 @@ static void draw_string(SDL_Renderer *renderer, const char *text, int x, int y, 
         }
     }
 }
+
+static void renderer_recalculate_layout(void)
+{
+    /* Use the smaller screen dimension to fit the square board, minus padding */
+    int min_dim = (current_screen_width < current_screen_height) ? current_screen_width
+                                                                 : current_screen_height;
+
+    BOARD_SIZE = min_dim - 40; /* 20px padding on each side */
+    if (BOARD_SIZE < 200)
+        BOARD_SIZE = 200; /* Minimum safety size */
+
+    TILE_SIZE = (BOARD_SIZE - (5 * TILE_MARGIN)) / 4;
+    START_X = (current_screen_width - BOARD_SIZE) / 2;
+    START_Y = (current_screen_height - BOARD_SIZE) / 2;
+    EFFECTIVE_START_Y = START_Y + 30; /* Adjust vertical offset as needed */
+}
 /* ==============================================================================
  * 3. Public API Implementation
  * ============================================================================== */
@@ -304,27 +323,31 @@ int renderer_init(RendererContext *ctx)
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
         return -1;
 
-    /* Create Window */
-    ctx->window =
-        SDL_CreateWindow("2048-Core (Animated)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                         SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+    /* Create Window with Resizable and HighDPI flags */
+    ctx->window = SDL_CreateWindow(
+        "2048-Core", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, current_screen_width,
+        current_screen_height, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+
     if (!ctx->window)
         return -1;
+
+    /* [NEW] Enforce Safe Resolution Limits */
+    SDL_SetWindowMinimumSize(ctx->window, 500, 300);
 
     /* Create Renderer */
     ctx->renderer =
         SDL_CreateRenderer(ctx->window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+
     if (!ctx->renderer)
         return -1;
 
-    /* Calculate Layout Dimensions */
-    /* Use the smaller screen dimension to fit the square board */
-    BOARD_SIZE = (SCREEN_WIDTH < SCREEN_HEIGHT ? SCREEN_WIDTH : SCREEN_HEIGHT) - 100;
-    TILE_SIZE = (BOARD_SIZE - (5 * TILE_MARGIN)) / 4;
-    START_X = (SCREEN_WIDTH - BOARD_SIZE) / 2;
-    START_Y = (SCREEN_HEIGHT - BOARD_SIZE) / 2;
-    EFFECTIVE_START_Y = START_Y + 30;
+    /* [FIX] 1. Get actual hardware size first */
+    SDL_GetRendererOutputSize(ctx->renderer, &current_screen_width, &current_screen_height);
 
+    /* [FIX] 2. Recalculate layout based on actual size */
+    renderer_recalculate_layout();
+
+    /* [FIX] 3. Initialize positions using the correct layout */
     for (i = 0; i < 16; i++) {
         float tx, ty;
         get_tile_pos(i, &tx, &ty);
@@ -335,6 +358,7 @@ int renderer_init(RendererContext *ctx)
         ctx->visual_board[i].current_scale = 0.0f;
     }
 
+    ctx->atlas = NULL;
     return 0;
 }
 
@@ -411,7 +435,7 @@ void renderer_update_animations(RendererContext *ctx, const GameState *state, fl
 
 void renderer_draw(RendererContext *ctx, const GameState *state, AppState app_state)
 {
-    int i, size, offset, val, title_scale;
+    int i, size, offset, val, title_scale, w, h;
     float scale, pulse;
     SDL_Rect rect;
     Color c_bg;
@@ -429,6 +453,17 @@ void renderer_draw(RendererContext *ctx, const GameState *state, AppState app_st
     char score_buf[32];
     char num_buf[32];
 
+    /* [NEW] Check for resize and update layout if needed */
+    SDL_GetRendererOutputSize(ctx->renderer, &w, &h);
+    if (w != current_screen_width || h != current_screen_height) {
+        current_screen_width = w;
+        current_screen_height = h;
+        renderer_recalculate_layout();
+
+        /* Optional: Re-snap visual tiles to new grid positions immediately
+         * to prevent them from flying in from old positions. */
+    }
+
     /* 1. Clear Screen */
     SDL_SetRenderDrawColor(ctx->renderer, 250, 248, 239, 255);
     SDL_RenderClear(ctx->renderer);
@@ -440,22 +475,24 @@ void renderer_draw(RendererContext *ctx, const GameState *state, AppState app_st
         title_scale = 10 + (int)(pulse * 1.0f);
 
         /* Draw Title */
-        draw_string(ctx->renderer, "2048", 0, SCREEN_HEIGHT / 3, SCREEN_WIDTH, title_scale, c_dark);
+        draw_string(ctx->renderer, "2048", 0, current_screen_height / 3, current_screen_width,
+                    title_scale, c_dark);
 
         /* Draw Instruction */
-        draw_string(ctx->renderer, "PRESS ENTER", 0, SCREEN_HEIGHT / 2 + 50, SCREEN_WIDTH, 3,
-                    c_dark);
+        draw_string(ctx->renderer, "PRESS ENTER", 0, current_screen_height / 2 + 50,
+                    current_screen_width, 3, c_dark);
 
     } else {
         /* STATE_PLAYING or STATE_GAMEOVER or STATE_VICTORY */
 
         /* Draw Score (Centered) */
-        draw_number(ctx->renderer, (int)state->score, 0, score_y_pos, SCREEN_WIDTH, 0, c_dark);
+        draw_number(ctx->renderer, (int)state->score, 0, score_y_pos, current_screen_width, 0,
+                    c_dark);
 
         /* [NEW] Draw High Score (Top-Right) */
         {
             int hs_w = 200;
-            int hs_x = SCREEN_WIDTH - hs_w - 20; /* 20px margin from right */
+            int hs_x = current_screen_width - hs_w - 20; /* 20px margin from right */
             int hs_y = 20;
 
             /* Label */
@@ -512,36 +549,37 @@ void renderer_draw(RendererContext *ctx, const GameState *state, AppState app_st
             SDL_SetRenderDrawColor(ctx->renderer, 238, 228, 218, 190);
             rect.x = 0;
             rect.y = 0;
-            rect.w = SCREEN_WIDTH;
-            rect.h = SCREEN_HEIGHT;
+            rect.w = current_screen_width;
+            rect.h = current_screen_height;
             SDL_RenderFillRect(ctx->renderer, &rect);
             SDL_SetRenderDrawBlendMode(ctx->renderer, SDL_BLENDMODE_NONE);
 
-            draw_string(ctx->renderer, "GAME OVER", 0, SCREEN_HEIGHT / 3, SCREEN_WIDTH, 5,
-                        c_overlay_text);
-            draw_string(ctx->renderer, "SCORE", 0, SCREEN_HEIGHT / 2, SCREEN_WIDTH, 3,
-                        c_overlay_text);
+            draw_string(ctx->renderer, "GAME OVER", 0, current_screen_height / 3,
+                        current_screen_width, 5, c_overlay_text);
+            draw_string(ctx->renderer, "SCORE", 0, current_screen_height / 2, current_screen_width,
+                        3, c_overlay_text);
 
             sprintf(score_buf, "%lu", state->score);
-            draw_string(ctx->renderer, score_buf, 0, SCREEN_HEIGHT / 2 + 40, SCREEN_WIDTH, 4,
-                        c_overlay_text);
+            draw_string(ctx->renderer, score_buf, 0, current_screen_height / 2 + 40,
+                        current_screen_width, 4, c_overlay_text);
 
-            draw_string(ctx->renderer, "PRESS R TO RESTART", 0, SCREEN_HEIGHT - 100, SCREEN_WIDTH,
-                        2, c_overlay_text);
+            draw_string(ctx->renderer, "PRESS R TO RESTART", 0, current_screen_height - 100,
+                        current_screen_width, 2, c_overlay_text);
         } else if (app_state == STATE_VICTORY) {
             /* Gold Semi-transparent Overlay */
             SDL_SetRenderDrawBlendMode(ctx->renderer, SDL_BLENDMODE_BLEND);
             SDL_SetRenderDrawColor(ctx->renderer, 237, 194, 46, 160);
             rect.x = 0;
             rect.y = 0;
-            rect.w = SCREEN_WIDTH;
-            rect.h = SCREEN_HEIGHT;
+            rect.w = current_screen_width;
+            rect.h = current_screen_height;
             SDL_RenderFillRect(ctx->renderer, &rect);
             SDL_SetRenderDrawBlendMode(ctx->renderer, SDL_BLENDMODE_NONE);
 
-            draw_string(ctx->renderer, "YOU WIN", 0, SCREEN_HEIGHT / 3, SCREEN_WIDTH, 5, c_light);
-            draw_string(ctx->renderer, "PRESS ENTER TO CONTINUE", 0, SCREEN_HEIGHT / 2 + 50,
-                        SCREEN_WIDTH, 2, c_light);
+            draw_string(ctx->renderer, "YOU WIN", 0, current_screen_height / 3,
+                        current_screen_width, 5, c_light);
+            draw_string(ctx->renderer, "PRESS ENTER TO CONTINUE", 0, current_screen_height / 2 + 50,
+                        current_screen_width, 2, c_light);
         }
     }
 
