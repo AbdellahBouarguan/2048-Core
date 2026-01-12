@@ -259,7 +259,7 @@ void test_renderer_update_animations(void)
 {
     RendererContext ctx;
     GameState state;
-    float dt_small = 0.1f;
+    float dt_small = 0.01f;
     float dt_large = 10.0f;
 
     memset(&ctx, 0, sizeof(RendererContext));
