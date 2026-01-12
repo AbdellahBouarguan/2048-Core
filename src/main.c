@@ -53,37 +53,92 @@ static void resolve_save_path(char *buffer, size_t max_len)
 #endif
 }
 
-/* Input Abstraction Layer */
-static InputCommand handle_input(SDL_Event *e)
+/* [NEW] Input Queue Implementation */
+#define INPUT_QUEUE_SIZE 4
+
+typedef struct {
+    InputCommand buffer[INPUT_QUEUE_SIZE];
+    int head;
+    int tail;
+    int count;
+} InputQueue;
+
+static void queue_init(InputQueue *q)
 {
-    if (e->type == SDL_QUIT)
-        return INPUT_EXIT;
-    if (e->type == SDL_KEYDOWN) {
+    q->head = 0;
+    q->tail = 0;
+    q->count = 0;
+}
+
+static void queue_push(InputQueue *q, InputCommand cmd)
+{
+    if (q->count < INPUT_QUEUE_SIZE) {
+        q->buffer[q->tail] = cmd;
+        q->tail = (q->tail + 1) % INPUT_QUEUE_SIZE;
+        q->count++;
+    }
+}
+
+static InputCommand queue_pop(InputQueue *q)
+{
+    InputCommand cmd = INPUT_NONE;
+    if (q->count > 0) {
+        cmd = q->buffer[q->head];
+        q->head = (q->head + 1) % INPUT_QUEUE_SIZE;
+        q->count--;
+    }
+    return cmd;
+}
+
+static int queue_is_empty(InputQueue *q)
+{
+    return (q->count == 0);
+}
+
+/* Input Abstraction Layer */
+static void handle_input(SDL_Event *e, InputQueue *q)
+{
+    InputCommand cmd = INPUT_NONE;
+    if (e->type == SDL_QUIT) {
+        cmd = INPUT_EXIT;
+    } else if (e->type == SDL_KEYDOWN) {
         switch (e->key.keysym.sym) {
         case SDLK_UP:
         case SDLK_w:
-            return INPUT_UP;
+            cmd = INPUT_UP;
+            break;
         case SDLK_DOWN:
         case SDLK_s:
-            return INPUT_DOWN;
+            cmd = INPUT_DOWN;
+            break;
         case SDLK_LEFT:
         case SDLK_a:
-            return INPUT_LEFT;
+            cmd = INPUT_LEFT;
+            break;
         case SDLK_RIGHT:
         case SDLK_d:
-            return INPUT_RIGHT;
+            cmd = INPUT_RIGHT;
+            break;
         case SDLK_RETURN:
         case SDLK_SPACE:
-            return INPUT_CONFIRM;
+            cmd = INPUT_CONFIRM;
+            break;
         case SDLK_r:
-            return INPUT_RESET;
+            cmd = INPUT_RESET;
+            break;
         case SDLK_ESCAPE:
-            return INPUT_EXIT;
+            cmd = INPUT_EXIT;
+            break;
         default:
-            return INPUT_NONE;
+            break;
         }
     }
-    return INPUT_NONE;
+
+    if (cmd != INPUT_NONE) {
+        /* Force EXIT to be immediate/handled by caller logic or pushed to front?
+         * Simple push is fine, but checking for EXIT in the event loop is safer. */
+        queue_push(q, cmd);
+    }
 }
 
 int main(int argc, char *argv[])
@@ -105,7 +160,7 @@ int main(int argc, char *argv[])
 
     /* FSM State */
     AppState app_state = STATE_MENU;
-    InputCommand cmd = INPUT_NONE;
+    /* InputCommand cmd = INPUT_NONE; */
     InputCommand frame_cmd = INPUT_NONE;
     Uint32 game_over_timer = 0;
     int reset_flag = 0;
@@ -113,6 +168,8 @@ int main(int argc, char *argv[])
     /* NEW: Event Buffer */
     MoveEvent move_events[32]; /* Max 16 moves + merges, 32 is safe */
     int move_event_count = 0;
+
+    InputQueue input_queue;
 
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--reset") == 0)
@@ -149,6 +206,8 @@ int main(int argc, char *argv[])
     /* Initialize timing */
     last_time = SDL_GetTicks();
 
+    queue_init(&input_queue);
+
     /* The Game Loop (FSM Refactor) */
     while (running) {
         frame_start = SDL_GetTicks();
@@ -160,11 +219,18 @@ int main(int argc, char *argv[])
 
         /* Input Polling */
         while (SDL_PollEvent(&event)) {
-            cmd = handle_input(&event);
-            if (cmd == INPUT_EXIT)
+            if (event.type == SDL_QUIT)
                 running = 0;
-            else if (cmd != INPUT_NONE)
-                frame_cmd = cmd;
+            else
+                handle_input(&event, &input_queue);
+        }
+
+        /* Pop one command per frame if available */
+        frame_cmd = INPUT_NONE;
+        if (!queue_is_empty(&input_queue)) {
+            frame_cmd = queue_pop(&input_queue);
+            if (frame_cmd == INPUT_EXIT)
+                running = 0;
         }
 
         /* State Machine Logic */
@@ -211,6 +277,11 @@ int main(int argc, char *argv[])
                     game_over_timer = 0;
                 }
 
+                /* [NEW] Victory Transition */
+                if (state.status == GAME_WON) {
+                    app_state = STATE_VICTORY;
+                }
+
                 if (game_check_over(&state)) {
                     if (game_over_timer == 0)
                         game_over_timer = SDL_GetTicks();
@@ -229,6 +300,14 @@ int main(int argc, char *argv[])
                     storage_save(save_path, &state);
                     game_over_timer = 0;
                 }
+            }
+            break;
+
+        /* [NEW] Victory State */
+        case STATE_VICTORY:
+            if (frame_cmd == INPUT_CONFIRM) {
+                state.status = GAME_ENDLESS; /* Set to Endless to prevent loop */
+                app_state = STATE_PLAYING;
             }
             break;
 

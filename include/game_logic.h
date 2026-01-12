@@ -9,10 +9,10 @@
  * ============================================================================== */
 
 /* Game Status Enumeration */
-typedef enum { GAME_ACTIVE = 0, GAME_WON = 1, GAME_OVER = 2 } GameStatus;
+typedef enum { GAME_ACTIVE = 0, GAME_WON = 1, GAME_OVER = 2, GAME_ENDLESS = 3 } GameStatus;
 
 /* Finite State Machine States */
-typedef enum { STATE_MENU, STATE_PLAYING, STATE_GAMEOVER } AppState;
+typedef enum { STATE_MENU, STATE_PLAYING, STATE_GAMEOVER, STATE_VICTORY } AppState;
 
 /* Movement Directions */
 typedef enum { DIR_UP = 0, DIR_DOWN = 1, DIR_LEFT = 2, DIR_RIGHT = 3 } Direction;

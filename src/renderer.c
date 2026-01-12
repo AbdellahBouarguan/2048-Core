@@ -418,7 +418,7 @@ void renderer_draw(RendererContext *ctx, const GameState *state, AppState app_st
     Color c_bg;
     Color c_text;
     Color c_dark = {119, 110, 101};
-    /* Color c_light = {249, 246, 242}; */
+    Color c_light = {249, 246, 242};
     Color c_overlay_text = {119, 110, 101};
 
     /* Layout Variables */
@@ -512,9 +512,23 @@ void renderer_draw(RendererContext *ctx, const GameState *state, AppState app_st
 
             draw_string(ctx->renderer, "PRESS R TO RESTART", SCREEN_HEIGHT - 100, SCREEN_WIDTH, 2,
                         c_overlay_text);
-        } else if (state->status == GAME_WON) {
-            /* Optional Victory Message (Non-blocking) */
-            draw_string(ctx->renderer, "YOU WIN", effective_start_y - 40, SCREEN_WIDTH, 3, c_dark);
+        } else if (app_state == STATE_VICTORY) {
+            /* Gold Semi-transparent Overlay */
+            SDL_SetRenderDrawBlendMode(ctx->renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(ctx->renderer, 237, 194, 46, 160);
+            rect.x = 0;
+            rect.y = 0;
+            rect.w = SCREEN_WIDTH;
+            rect.h = SCREEN_HEIGHT;
+            SDL_RenderFillRect(ctx->renderer, &rect);
+            SDL_SetRenderDrawBlendMode(ctx->renderer, SDL_BLENDMODE_NONE);
+
+            /* "YOU WIN" Text */
+            draw_string(ctx->renderer, "YOU WIN", SCREEN_HEIGHT / 3, SCREEN_WIDTH, 5, c_light);
+
+            /* Instruction Text */
+            draw_string(ctx->renderer, "PRESS ENTER TO CONTINUE", SCREEN_HEIGHT / 2 + 50,
+                        SCREEN_WIDTH, 2, c_light);
         }
     }
 

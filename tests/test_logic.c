@@ -192,6 +192,25 @@ void test_move_events(void)
     printf("  %s[PASS]%s\n", ANSI_COLOR_GREEN, ANSI_COLOR_RESET);
 }
 
+void test_victory_condition(void)
+{
+    /* Setup: [1024, 1024, 0, 0] */
+    GameState state;
+    int initial[] = {1024, 1024, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    game_init(&state);
+    set_board(&state, initial);
+
+    ASSERT_INT_EQ(GAME_ACTIVE, state.status, "Game should start ACTIVE");
+
+    /* Slide LEFT -> [2048, 0, 0, 0] */
+    game_slide(&state, DIR_LEFT, NULL, NULL);
+
+    ASSERT_INT_EQ(2048, state.board[0], "Should merge to 2048");
+    ASSERT_INT_EQ(GAME_WON, state.status, "Status should be GAME_WON");
+
+    printf("  %s[PASS]%s\n", ANSI_COLOR_GREEN, ANSI_COLOR_RESET);
+}
+
 void test_game_over(void)
 {
     GameState state;
@@ -370,6 +389,7 @@ int main(void)
     run_test(test_triple_merge_rule, "Logic: Triple Merge Rule");
     run_test(test_recursive_merge_rule, "Logic: Recursive Merge Rule");
     run_test(test_move_events, "Logic: Move Event Generation");
+    run_test(test_victory_condition, "Logic: Victory Condition (2048)");
     run_test(test_game_over, "Logic: Game Over Detection");
 
     /* Animation */
