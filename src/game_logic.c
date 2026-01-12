@@ -213,7 +213,7 @@ int game_slide(GameState *state, int dir, MoveEvent *events, int *event_count)
 
         /* Check for 2048 tile to set Win state */
         for (i = 0; i < 16; i++) {
-            if (state->board[i] == 2048 && state->status != GAME_WON) {
+            if (state->board[i] == 2048 && state->status == GAME_ACTIVE) {
                 state->status = GAME_WON;
             }
         }
