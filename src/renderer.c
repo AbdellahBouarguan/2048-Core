@@ -23,7 +23,7 @@ static int START_Y = 0;
 static int EFFECTIVE_START_Y = 0;
 
 /* ==============================================================================
- * 1. Embedded Assets (Font) & Helpers
+ * 1a. Embedded Assets (Font)
  * ============================================================================== */
 static const unsigned char FONT[10][5] = {
     {0x1F, 0x11, 0x11, 0x11, 0x1F}, {0x04, 0x0C, 0x04, 0x04, 0x0E}, {0x1F, 0x01, 0x1F, 0x10, 0x1F},
@@ -31,6 +31,39 @@ static const unsigned char FONT[10][5] = {
     {0x1F, 0x10, 0x1F, 0x11, 0x1F}, {0x1F, 0x01, 0x02, 0x04, 0x04}, {0x1F, 0x11, 0x1F, 0x11, 0x1F},
     {0x1F, 0x11, 0x1F, 0x01, 0x1F}};
 
+/* ==============================================================================
+ * 1b. Embedded Assets: 5x5 Pixel Alphabet (A-Z)
+ * ============================================================================== */
+static const unsigned char ALPHABET[26][5] = {
+    {0x0E, 0x11, 0x1F, 0x11, 0x11}, /* A */
+    {0x1E, 0x11, 0x1E, 0x11, 0x1E}, /* B */
+    {0x0E, 0x11, 0x10, 0x11, 0x0E}, /* C */
+    {0x1C, 0x12, 0x12, 0x12, 0x1C}, /* D */
+    {0x1F, 0x10, 0x1E, 0x10, 0x1F}, /* E */
+    {0x1F, 0x10, 0x1E, 0x10, 0x10}, /* F */
+    {0x0E, 0x11, 0x10, 0x13, 0x0E}, /* G */
+    {0x11, 0x11, 0x1F, 0x11, 0x11}, /* H */
+    {0x0E, 0x04, 0x04, 0x04, 0x0E}, /* I */
+    {0x1F, 0x02, 0x02, 0x12, 0x0C}, /* J */
+    {0x11, 0x12, 0x1C, 0x12, 0x11}, /* K */
+    {0x10, 0x10, 0x10, 0x10, 0x1F}, /* L */
+    {0x11, 0x1B, 0x15, 0x11, 0x11}, /* M */
+    {0x11, 0x19, 0x15, 0x13, 0x11}, /* N */
+    {0x0E, 0x11, 0x11, 0x11, 0x0E}, /* O */
+    {0x1E, 0x11, 0x1E, 0x10, 0x10}, /* P */
+    {0x0E, 0x11, 0x11, 0x12, 0x0D}, /* Q */
+    {0x1E, 0x11, 0x1E, 0x12, 0x11}, /* R */
+    {0x0F, 0x10, 0x0E, 0x01, 0x1E}, /* S */
+    {0x1F, 0x04, 0x04, 0x04, 0x04}, /* T */
+    {0x11, 0x11, 0x11, 0x11, 0x0E}, /* U */
+    {0x11, 0x11, 0x11, 0x0A, 0x04}, /* V */
+    {0x11, 0x11, 0x15, 0x15, 0x0A}, /* W */
+    {0x11, 0x0A, 0x04, 0x0A, 0x11}, /* X */
+    {0x11, 0x0A, 0x04, 0x04, 0x04}, /* Y */
+    {0x1F, 0x02, 0x04, 0x08, 0x1F}  /* Z */
+};
+
+/* Helpers */
 typedef struct {
     Uint8 r, g, b;
 } Color;
@@ -216,6 +249,50 @@ static void draw_number(SDL_Renderer *renderer, int value, int x, int y, int are
     }
 }
 
+/**
+ * @brief Renders a string centered horizontally at the given Y position.
+ * Supports A-Z (caps only), 0-9, and spaces.
+ */
+static void draw_string(SDL_Renderer *renderer, const char *text, int y, int screen_w, int scale,
+                        Color color)
+{
+    int len = (int)strlen(text);
+    int char_w = 5 * scale;
+    int spacing = 2 * scale;
+    int total_w = (len * char_w) + ((len - 1) * spacing);
+    int start_x = (screen_w - total_w) / 2;
+    int i, row, col;
+    SDL_Rect rect;
+
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
+
+    for (i = 0; i < len; i++) {
+        char c = text[i];
+        const unsigned char *bitmap = NULL;
+
+        if (c >= 'A' && c <= 'Z') {
+            bitmap = ALPHABET[c - 'A'];
+        } else if (c >= '0' && c <= '9') {
+            bitmap = FONT[c - '0'];
+        }
+
+        if (bitmap) {
+            for (row = 0; row < 5; row++) {
+                for (col = 0; col < 5; col++) {
+                    if (bitmap[row] & (0x10 >> col)) {
+                        rect.x = start_x + (i * (char_w + spacing)) + (col * scale);
+                        rect.y = y + (row * scale);
+                        rect.w = scale;
+                        rect.h = scale;
+                        SDL_RenderFillRect(renderer, &rect);
+                    }
+                }
+            }
+        }
+        /* Spaces simply advance the loop without drawing */
+    }
+}
+
 /* ==============================================================================
  * 3. Public API Implementation
  * ============================================================================== */
@@ -335,28 +412,56 @@ void renderer_update_animations(RendererContext *ctx, const GameState *state, fl
 
 void renderer_draw(RendererContext *ctx, const GameState *state, AppState app_state)
 {
-    int i, val, size, offset;
-    float scale;
+    int i, size, offset, val, title_scale;
+    float scale, pulse;
     SDL_Rect rect;
-    Color c_bg, c_text, c_score = {119, 110, 101};
+    Color c_bg;
+    Color c_text;
+    Color c_dark = {119, 110, 101};
+    /* Color c_light = {249, 246, 242}; */
+    Color c_overlay_text = {119, 110, 101};
 
+    /* Layout Variables */
+    int score_y_pos = 20;
+    int effective_start_y = START_Y + 30;
+
+    /* Draw Score */
+    char score_buf[32];
+
+    /* 1. Clear Screen */
     SDL_SetRenderDrawColor(ctx->renderer, 250, 248, 239, 255);
     SDL_RenderClear(ctx->renderer);
 
+    /* 2. State-Based Rendering */
     if (app_state == STATE_MENU) {
-        draw_number(ctx->renderer, 2048, 0, SCREEN_HEIGHT / 3, SCREEN_WIDTH, 0, c_score);
-    } else {
-        draw_number(ctx->renderer, (int)state->score, 0, 20, SCREEN_WIDTH, 0, c_score);
+        /* Pulse Animation */
+        pulse = (float)sin((float)SDL_GetTicks() * 0.005f);
+        /* Map sine [-1, 1] to scale [4, 5] roughly, or just simple scaling */
+        title_scale = 10 + (int)(pulse * 1.0f); /* Base size 10, varies +/- 1 */
 
-        /* Draw Grid Background */
+        /* Draw Title (using draw_number manual placement or simplified string) */
+        /* Note: draw_string handles 0-9 so we can use it for "2048" */
+        draw_string(ctx->renderer, "2048", SCREEN_HEIGHT / 3, SCREEN_WIDTH, title_scale, c_dark);
+
+        /* Draw Instruction */
+        draw_string(ctx->renderer, "PRESS ENTER", SCREEN_HEIGHT / 2 + 50, SCREEN_WIDTH, 3, c_dark);
+
+    } else {
+        /* STATE_PLAYING or STATE_GAMEOVER */
+
+        sprintf(score_buf, "%lu", state->score);
+        /* Using draw_number for the main score as before, or draw_string for consistency */
+        draw_number(ctx->renderer, (int)state->score, 0, score_y_pos, SCREEN_WIDTH, 0, c_dark);
+
+        /* Draw Board Background */
         SDL_SetRenderDrawColor(ctx->renderer, 187, 173, 160, 255);
         rect.x = START_X;
-        rect.y = EFFECTIVE_START_Y;
+        rect.y = effective_start_y;
         rect.w = BOARD_SIZE;
         rect.h = BOARD_SIZE;
         SDL_RenderFillRect(ctx->renderer, &rect);
 
-        /* Draw Tiles using visual_board coordinates */
+        /* Draw Tiles */
         for (i = 0; i < 16; i++) {
             /* Skip if effectively invisible */
             if (ctx->visual_board[i].current_scale < 0.01f)
@@ -374,29 +479,47 @@ void renderer_draw(RendererContext *ctx, const GameState *state, AppState app_st
             rect.w = size;
             rect.h = size;
 
+            /* Draw Tile Background */
             c_bg = get_tile_color(val);
             SDL_SetRenderDrawColor(ctx->renderer, c_bg.r, c_bg.g, c_bg.b, 255);
             SDL_RenderFillRect(ctx->renderer, &rect);
 
+            /* Draw Number */
             if (val > 0) {
                 c_text = get_tile_text_color(val);
                 draw_number(ctx->renderer, val, rect.x, rect.y, size, size, c_text);
             }
         }
 
+        /* 3. Overlays (Game Over / Victory) */
         if (app_state == STATE_GAMEOVER) {
+            /* Semi-transparent background */
             SDL_SetRenderDrawBlendMode(ctx->renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(ctx->renderer, 238, 228, 218, 180);
+            SDL_SetRenderDrawColor(ctx->renderer, 238, 228, 218, 190);
             rect.x = 0;
             rect.y = 0;
             rect.w = SCREEN_WIDTH;
             rect.h = SCREEN_HEIGHT;
             SDL_RenderFillRect(ctx->renderer, &rect);
+            SDL_SetRenderDrawBlendMode(ctx->renderer, SDL_BLENDMODE_NONE);
+
+            draw_string(ctx->renderer, "GAME OVER", SCREEN_HEIGHT / 3, SCREEN_WIDTH, 5,
+                        c_overlay_text);
+
+            draw_string(ctx->renderer, "SCORE", SCREEN_HEIGHT / 2, SCREEN_WIDTH, 3, c_overlay_text);
+            draw_string(ctx->renderer, score_buf, SCREEN_HEIGHT / 2 + 40, SCREEN_WIDTH, 4,
+                        c_overlay_text);
+
+            draw_string(ctx->renderer, "PRESS R TO RESTART", SCREEN_HEIGHT - 100, SCREEN_WIDTH, 2,
+                        c_overlay_text);
+        } else if (state->status == GAME_WON) {
+            /* Optional Victory Message (Non-blocking) */
+            draw_string(ctx->renderer, "YOU WIN", effective_start_y - 40, SCREEN_WIDTH, 3, c_dark);
         }
     }
+
     SDL_RenderPresent(ctx->renderer);
 }
-
 void renderer_cleanup(RendererContext *ctx)
 {
     if (ctx->renderer)
