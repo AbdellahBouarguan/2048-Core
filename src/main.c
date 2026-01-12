@@ -6,6 +6,7 @@
  * ============================================================================== */
 
 #include <SDL.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +25,11 @@
 #define FPS_CAP 60
 #define FRAME_DELAY (1000 / FPS_CAP)
 #define APP_VERSION "1.0.0"
+
+static float touch_start_x = 0.0f;
+static float touch_start_y = 0.0f;
+static int mouse_start_x = 0;
+static int mouse_start_y = 0;
 
 /* Helper: Resolves the save directory based on platform */
 static void resolve_save_path(char *buffer, size_t max_len)
@@ -131,6 +137,37 @@ static void handle_input(SDL_Event *e, InputQueue *q)
             break;
         default:
             break;
+        }
+    }
+    /* [NEW] Touch Swipe Handling */
+    else if (e->type == SDL_FINGERDOWN) {
+        touch_start_x = e->tfinger.x;
+        touch_start_y = e->tfinger.y;
+    } else if (e->type == SDL_FINGERUP) {
+        float dx = e->tfinger.x - touch_start_x;
+        float dy = e->tfinger.y - touch_start_y;
+        /* Threshold: 0.05 (5% of screen) to ignore accidental taps */
+        if (fabs(dx) > 0.05f || fabs(dy) > 0.05f) {
+            if (fabs(dx) > fabs(dy)) {
+                cmd = (dx > 0) ? INPUT_RIGHT : INPUT_LEFT;
+            } else {
+                cmd = (dy > 0) ? INPUT_DOWN : INPUT_UP;
+            }
+        }
+    } /* [NEW] Mouse Swipe Handling (for testing/PC) */
+    else if (e->type == SDL_MOUSEBUTTONDOWN) {
+        mouse_start_x = e->button.x;
+        mouse_start_y = e->button.y;
+    } else if (e->type == SDL_MOUSEBUTTONUP) {
+        int dx = e->button.x - mouse_start_x;
+        int dy = e->button.y - mouse_start_y;
+        /* Threshold: 50 pixels */
+        if (abs(dx) > 50 || abs(dy) > 50) {
+            if (abs(dx) > abs(dy)) {
+                cmd = (dx > 0) ? INPUT_RIGHT : INPUT_LEFT;
+            } else {
+                cmd = (dy > 0) ? INPUT_DOWN : INPUT_UP;
+            }
         }
     }
 
