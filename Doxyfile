@@ -3015,15 +3015,34 @@ MSCGEN_TOOL            =
 
 MSCFILE_DIRS           =
 
-# --- 2048-Core Overrides ---
+# --- 2048-Core Enhanced Config ---
 PROJECT_NAME           = "2048-Core"
+PROJECT_NUMBER         = "1.0.0"
 OUTPUT_DIRECTORY       = docs/
+
+# Build Options
 OPTIMIZE_OUTPUT_FOR_C  = YES
 EXTRACT_ALL            = YES
 EXTRACT_PRIVATE        = YES
 EXTRACT_STATIC         = YES
 RECURSIVE              = YES
+
+# Input & Navigation
+USE_MDFILE_AS_MAINPAGE = README.md
+INPUT                  = src include android/app/src/main/java scripts README.md CONTRIBUTING.md
+FILE_PATTERNS          = *.c *.h *.java *.sh *.md
+EXTENSION_MAPPING      = sh=C
+SOURCE_BROWSER         = YES
+
+# Visuals (Graphs)
+HAVE_DOT               = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+DIRECTORY_GRAPH        = YES
+DOT_IMAGE_FORMAT       = svg
+INTERACTIVE_SVG        = YES
+
+# Math (LaTeX)
+USE_MATHJAX            = YES
 GENERATE_LATEX         = NO
 GENERATE_HTML          = YES
-INPUT                  = src include
-FILE_PATTERNS          = *.c *.h
