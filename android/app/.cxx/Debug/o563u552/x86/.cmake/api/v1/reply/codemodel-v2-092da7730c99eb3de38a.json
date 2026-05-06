@@ -1,0 +1,138 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1
+					],
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.6.0"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						2,
+						3
+					]
+				},
+				{
+					"build" : "libs/SDL2",
+					"jsonFile" : "directory-libs.SDL2-Debug-e4b63f3664ab0b4230ef.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.4"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "libs/SDL2",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						4,
+						5
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1
+					],
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "2048-Core",
+					"targetIndexes" : 
+					[
+						2,
+						3
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						1
+					],
+					"name" : "SDL2",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						4,
+						5
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 1,
+					"id" : "SDL2::@769070f314eb9cdddcb1",
+					"jsonFile" : "target-SDL2-Debug-e655e101a044f23c1ed2.json",
+					"name" : "SDL2",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "SDL2main::@769070f314eb9cdddcb1",
+					"jsonFile" : "target-SDL2main-Debug-b5237263d2b73b00d653.json",
+					"name" : "SDL2main",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "core_logic::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-core_logic-Debug-5cca6a82f74701e6d74f.json",
+					"name" : "core_logic",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "main::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-main-Debug-f2fc3a7b4e3f1650947a.json",
+					"name" : "main",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "sdl_headers_copy::@769070f314eb9cdddcb1",
+					"jsonFile" : "target-sdl_headers_copy-Debug-8f77e4c617a6117ebb3b.json",
+					"name" : "sdl_headers_copy",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "uninstall::@769070f314eb9cdddcb1",
+					"jsonFile" : "target-uninstall-Debug-1ba8854fb0c0f6c78e26.json",
+					"name" : "uninstall",
+					"projectIndex" : 1
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/boua/Desktop/My_C_and_C++_env/my_games_project/fstGame/2048-Core/android/app/.cxx/Debug/o563u552/x86",
+		"source" : "/home/boua/Desktop/My_C_and_C++_env/my_games_project/fstGame/2048-Core"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}
