@@ -30,3 +30,7 @@ local.properties
 .gradle/
 *.apk
 *.ap_
+
+# Local SDKs and Temp
+libs/android-sdk/
+libs/gradle_temp/
