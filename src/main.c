@@ -148,11 +148,15 @@ static void handle_input(SDL_Event *e, InputQueue *q)
         float dy = e->tfinger.y - touch_start_y;
         /* Threshold: 0.05 (5% of screen) to ignore accidental taps */
         if (fabs(dx) > 0.05f || fabs(dy) > 0.05f) {
+            /* It's a swipe */
             if (fabs(dx) > fabs(dy)) {
                 cmd = (dx > 0) ? INPUT_RIGHT : INPUT_LEFT;
             } else {
                 cmd = (dy > 0) ? INPUT_DOWN : INPUT_UP;
             }
+        } else {
+            /* [NEW] It's a Tap! Treat as ENTER/CONFIRM */
+            cmd = INPUT_CONFIRM;
         }
     } /* [NEW] Mouse Swipe Handling (for testing/PC) */
     else if (e->type == SDL_MOUSEBUTTONDOWN) {
