@@ -1,0 +1,5 @@
+# Third-party code: exclude vendored SDL2 from GitHub language statistics.
+# Without this, Linguist counts libs/SDL2 (C, C++, Objective-C, M4, Perl,
+# Shell, CMake, Makefile, Assembly, Metal) as project code and C dominates
+# the repository language breakdown.
+libs/** linguist-vendored
