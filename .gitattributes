@@ -1,5 +1,10 @@
-# Third-party code: exclude vendored SDL2 from GitHub language statistics.
-# Without this, Linguist counts libs/SDL2 (C, C++, Objective-C, M4, Perl,
-# Shell, CMake, Makefile, Assembly, Metal) as project code and C dominates
-# the repository language breakdown.
+# Third-party / generated code: keep GitHub language statistics meaningful.
+#
+# 1. libs/SDL2 is vendored SDL2 source (C, C++, Objective-C, M4, Perl, Shell,
+#    CMake, Makefile, Assembly, Metal). Without this it dominated the
+#    repository language breakdown (C ~87%).
 libs/** linguist-vendored
+
+# 2. android/app/.cxx is CMake build output committed to the repo
+#    (generated headers, ninja logs, JSON). It is not project source.
+android/app/.cxx/** linguist-generated
